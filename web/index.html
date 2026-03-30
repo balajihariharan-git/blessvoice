@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BlessVoice</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0a0a0f;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        h1 {
+            font-size: 1.2rem;
+            font-weight: 300;
+            letter-spacing: 0.3em;
+            text-transform: uppercase;
+            color: #555;
+            margin-bottom: 3rem;
+        }
+        .orb {
+            width: 220px; height: 220px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #1a1a3e, #0a0a1a);
+            border: 2px solid #222;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+        .orb.listening {
+            border-color: #4a9eff;
+            box-shadow: 0 0 60px rgba(74, 158, 255, 0.2);
+            animation: breathe 2.5s ease-in-out infinite;
+        }
+        .orb.hearing {
+            border-color: #4a9eff;
+            box-shadow: 0 0 120px rgba(74, 158, 255, 0.5);
+            animation: pulse 0.3s ease-in-out infinite;
+        }
+        .orb.thinking {
+            border-color: #ffaa00;
+            box-shadow: 0 0 60px rgba(255, 170, 0, 0.3);
+            animation: breathe 1s ease-in-out infinite;
+        }
+        .orb.speaking {
+            border-color: #00dd88;
+            box-shadow: 0 0 100px rgba(0, 221, 136, 0.4);
+            animation: pulse 0.5s ease-in-out infinite;
+        }
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.04); }
+        }
+        .status {
+            margin-top: 2rem;
+            font-size: 0.75rem;
+            color: #333;
+            min-height: 1.2em;
+        }
+        .dot {
+            position: fixed; top: 1rem; right: 1rem;
+            width: 8px; height: 8px; border-radius: 50%;
+            background: #ff4444;
+        }
+        .dot.on { background: #00dd88; }
+    </style>
+</head>
+<body>
+    <h1>BlessVoice</h1>
+    <div class="orb" id="orb"></div>
+    <div class="status" id="status"></div>
+    <div class="dot" id="dot"></div>
+
+    <script>
+    const orb = document.getElementById('orb');
+    const statusEl = document.getElementById('status');
+    const dot = document.getElementById('dot');
+
+    let ws = null;
+    let audioCtx = null;
+    let micStream = null;
+    let processor = null;
+    let source = null;
+
+    // VAD
+    let speaking = false;
+    let silenceStart = 0;
+    let speechStart = 0;
+    let audioChunks = [];
+    const SILENCE_THRESH = 0.012;
+    const SILENCE_MS = 800;
+    const MIN_SPEECH_MS = 300;
+
+    // Playback
+    let playbackCtx = null;
+    let isAISpeaking = false;
+    let pcmBuffer = [];
+    let nextPlayTime = 0;
+
+    // State
+    let state = 'idle';
+
+    function setState(s) {
+        state = s;
+        orb.className = 'orb ' + s;
+    }
+
+    // --- WebSocket ---
+    function connect() {
+        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        ws = new WebSocket(`${proto}//${location.host}/ws`);
+        ws.binaryType = 'arraybuffer';
+
+        ws.onopen = () => { dot.classList.add('on'); startMic(); };
+        ws.onclose = () => { dot.classList.remove('on'); setTimeout(connect, 2000); };
+        ws.onerror = () => setState('idle');
+
+        ws.onmessage = (e) => {
+            if (e.data instanceof ArrayBuffer) {
+                playPCMChunk(e.data);
+            } else {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'speaking') {
+                    // Kill ANY previous audio before starting new response
+                    stopPlayback();
+                    isAISpeaking = true;
+                    setState('speaking');
+                } else if (msg.type === 'done') {
+                    isAISpeaking = false;
+                    setState('listening');
+                }
+            }
+        };
+    }
+
+    // --- Microphone (always on) ---
+    async function startMic() {
+        try {
+            micStream = await navigator.mediaDevices.getUserMedia({
+                audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+            });
+            audioCtx = new AudioContext({ sampleRate: 16000 });
+            source = audioCtx.createMediaStreamSource(micStream);
+            processor = audioCtx.createScriptProcessor(2048, 1, 1);
+
+            processor.onaudioprocess = onAudio;
+            source.connect(processor);
+            processor.connect(audioCtx.destination);
+            setState('listening');
+        } catch (err) {
+            statusEl.textContent = 'Mic access needed';
+        }
+    }
+
+    function onAudio(e) {
+        const pcm = e.inputBuffer.getChannelData(0);
+        const level = avgLevel(pcm);
+
+        if (level > SILENCE_THRESH) {
+            // User is speaking
+            if (isAISpeaking) {
+                // INTERRUPT: user spoke over AI
+                isAISpeaking = false;
+                stopPlayback();
+                if (ws && ws.readyState === 1) {
+                    ws.send(JSON.stringify({ type: 'interrupt' }));
+                }
+            }
+
+            if (!speaking) {
+                speaking = true;
+                speechStart = Date.now();
+                audioChunks = [];
+            }
+            silenceStart = 0;
+            audioChunks.push(new Float32Array(pcm));
+            setState('hearing');
+
+        } else if (speaking) {
+            audioChunks.push(new Float32Array(pcm));
+            if (!silenceStart) silenceStart = Date.now();
+            else if (Date.now() - silenceStart > SILENCE_MS) {
+                // Silence long enough — send audio
+                if (Date.now() - speechStart > MIN_SPEECH_MS) {
+                    sendAudio();
+                }
+                speaking = false;
+                silenceStart = 0;
+                audioChunks = [];
+            }
+        } else {
+            if (state !== 'listening' && state !== 'thinking' && state !== 'speaking') {
+                setState('listening');
+            }
+        }
+    }
+
+    function avgLevel(pcm) {
+        let sum = 0;
+        for (let i = 0; i < pcm.length; i++) sum += Math.abs(pcm[i]);
+        return sum / pcm.length;
+    }
+
+    function sendAudio() {
+        if (!audioChunks.length || !ws || ws.readyState !== 1) return;
+        const total = audioChunks.reduce((s, c) => s + c.length, 0);
+        const merged = new Float32Array(total);
+        let off = 0;
+        for (const c of audioChunks) { merged.set(c, off); off += c.length; }
+        ws.send(merged.buffer);
+        setState('thinking');
+    }
+
+    // --- PCM Playback (low latency, no WAV decode overhead) ---
+    let activeSources = [];
+
+    function playPCMChunk(arrayBuffer) {
+        if (!playbackCtx || playbackCtx.state === 'closed') {
+            playbackCtx = new AudioContext({ sampleRate: 24000 });
+            nextPlayTime = 0;
+        }
+
+        const int16 = new Int16Array(arrayBuffer);
+        const float32 = new Float32Array(int16.length);
+        for (let i = 0; i < int16.length; i++) {
+            float32[i] = int16[i] / 32768;
+        }
+
+        const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
+        buffer.getChannelData(0).set(float32);
+
+        const src = playbackCtx.createBufferSource();
+        src.buffer = buffer;
+        src.connect(playbackCtx.destination);
+
+        const now = playbackCtx.currentTime;
+        if (nextPlayTime < now) nextPlayTime = now + 0.01;
+        src.start(nextPlayTime);
+        nextPlayTime += buffer.duration;
+
+        activeSources.push(src);
+        src.onended = () => {
+            activeSources = activeSources.filter(s => s !== src);
+        };
+    }
+
+    function stopPlayback() {
+        // Stop all currently playing/scheduled audio sources
+        for (const src of activeSources) {
+            try { src.stop(); } catch(e) {}
+        }
+        activeSources = [];
+
+        // Close and recreate context to ensure clean slate
+        if (playbackCtx && playbackCtx.state !== 'closed') {
+            playbackCtx.close().catch(() => {});
+        }
+        playbackCtx = null;
+        nextPlayTime = 0;
+    }
+
+    connect();
+    </script>
+</body>
+</html>

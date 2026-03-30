@@ -1,0 +1,62 @@
+# Models (large binary files, download separately)
+models/
+*.gguf
+*.bin
+*.pt
+*.pth
+*.onnx
+*.safetensors
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+venv/
+env/
+.venv/
+
+# Torch hub cache
+torch_hub/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Environment
+.env
+.env.local
+*.env
+
+# Logs
+*.log
+logs/
+
+# Data (training audio, recordings)
+data/
+recordings/
+*.wav
+*.mp3
+*.flac
+*.ogg
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# LoRA adapters (large, versioned separately)
+adapters/
+*-lora.bin

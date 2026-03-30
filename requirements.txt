@@ -1,0 +1,14 @@
+# BlessVoice — Phase 1 (Pipeline Prototype)
+# Uses OpenAI APIs for STT/LLM/TTS
+openai>=1.0.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.34.0
+websockets>=12.0
+numpy>=1.26.0
+
+# Phase 2 dependencies (PersonaPlex on GPU) — uncomment when ready
+# torch>=2.1.0
+# torchaudio>=2.1.0
+# peft>=0.7.0          # LoRA fine-tuning
+# transformers>=4.36.0
+# accelerate>=0.25.0
