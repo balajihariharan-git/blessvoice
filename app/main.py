@@ -1,7 +1,17 @@
-"""BlessVoice Server — Real-time voice-to-voice with streaming pipeline."""
+"""BlessVoice Server — Real-time voice-to-voice with streaming pipeline.
+
+Supports two modes:
+  - CPU mode (default): Uses OpenAI APIs (STT -> LLM -> TTS)
+  - GPU mode: Uses PersonaPlex 7B + Llama 3.1 8B on local GPU
+
+Mode is auto-detected based on CUDA availability, or forced via
+BLESSVOICE_MODE environment variable ("gpu" or "cpu").
+"""
 
 import json
 import asyncio
+import logging
+import os
 import queue
 import threading
 import traceback
@@ -10,7 +20,73 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from app.pipeline import VoicePipeline
+logger = logging.getLogger("blessvoice.server")
+
+# --- Mode Detection ---
+
+def _detect_mode() -> str:
+    """Detect whether to use GPU or CPU pipeline.
+
+    Priority:
+      1. BLESSVOICE_MODE env var ("gpu" or "cpu")
+      2. Auto-detect: check for CUDA + PersonaPlex model files
+    """
+    env_mode = os.environ.get("BLESSVOICE_MODE", "").lower().strip()
+    if env_mode in ("gpu", "cpu"):
+        return env_mode
+
+    # Auto-detect GPU
+    try:
+        import torch
+        if not torch.cuda.is_available():
+            logger.info("No CUDA GPU detected. Using CPU pipeline (OpenAI APIs).")
+            return "cpu"
+    except ImportError:
+        logger.info("PyTorch not installed. Using CPU pipeline (OpenAI APIs).")
+        return "cpu"
+
+    # Check if PersonaPlex model exists
+    try:
+        from app.gpu_config import PERSONAPLEX_LOCAL_DIR
+        if not PERSONAPLEX_LOCAL_DIR.exists():
+            logger.info(
+                f"PersonaPlex model not found at {PERSONAPLEX_LOCAL_DIR}. "
+                "Using CPU pipeline. Run infra/download-models.sh to download."
+            )
+            return "cpu"
+    except ImportError:
+        return "cpu"
+
+    logger.info("CUDA GPU detected + PersonaPlex model found. Using GPU pipeline.")
+    return "gpu"
+
+
+MODE = _detect_mode()
+
+
+# --- Pipeline Factory ---
+
+_pipeline_instance = None
+_gpu_pipeline_initialized = False
+
+
+def _create_pipeline():
+    """Create the appropriate pipeline based on detected mode."""
+    global _gpu_pipeline_initialized
+
+    if MODE == "gpu":
+        from app.gpu_pipeline import GPUVoicePipeline
+        pipeline = GPUVoicePipeline()
+        if not _gpu_pipeline_initialized:
+            pipeline.initialize()
+            _gpu_pipeline_initialized = True
+        return pipeline
+    else:
+        from app.pipeline import VoicePipeline
+        return VoicePipeline()
+
+
+# --- FastAPI App ---
 
 app = FastAPI(title="BlessVoice")
 
@@ -25,21 +101,42 @@ async def index():
 
 @app.get("/health")
 async def health():
-    return {"status": "ok"}
+    return {
+        "status": "ok",
+        "mode": MODE,
+        "gpu": MODE == "gpu",
+    }
 
 
 @app.on_event("startup")
 async def startup():
-    print("\n=== BlessVoice Ready ===")
+    mode_label = "GPU (PersonaPlex + Llama)" if MODE == "gpu" else "CPU (OpenAI APIs)"
+    print(f"\n=== BlessVoice Ready [{mode_label}] ===")
     print("=== Open http://localhost:8000 ===\n")
+
+    if MODE == "gpu":
+        # Pre-initialize the GPU pipeline at startup so the first
+        # WebSocket connection doesn't wait for model loading.
+        try:
+            global _pipeline_instance
+            _pipeline_instance = _create_pipeline()
+            logger.info("GPU pipeline pre-initialized at startup.")
+        except Exception as e:
+            logger.error(f"GPU pipeline startup failed: {e}")
+            logger.error("Falling back to CPU mode for this session.")
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await ws.accept()
-    print("[WS] Client connected")
+    logger.info(f"[WS] Client connected (mode={MODE})")
 
-    pipeline = VoicePipeline()
+    # Create or reuse pipeline
+    if MODE == "gpu" and _pipeline_instance is not None:
+        pipeline = _pipeline_instance
+    else:
+        pipeline = _create_pipeline()
+
     current_thread = None
 
     try:
@@ -51,15 +148,17 @@ async def websocket_endpoint(ws: WebSocket):
 
                 # ALWAYS abort previous pipeline before starting new one
                 if current_thread and current_thread.is_alive():
-                    print("[WS] Aborting previous pipeline")
+                    logger.info("[WS] Aborting previous pipeline")
                     pipeline.abort()
                     current_thread.join(timeout=3)
 
                 # Drain any leftover chunks from previous queue
                 if 'audio_q' in dir():
                     while not audio_q.empty():
-                        try: audio_q.get_nowait()
-                        except: break
+                        try:
+                            audio_q.get_nowait()
+                        except queue.Empty:
+                            break
 
                 # Fresh queue for this request
                 audio_q = queue.Queue()
@@ -69,7 +168,7 @@ async def websocket_endpoint(ws: WebSocket):
                     try:
                         pipeline.process(audio_bytes, audio_q)
                     except Exception as e:
-                        print(f"[Pipeline Error] {e}")
+                        logger.error(f"[Pipeline Error] {e}")
                         traceback.print_exc()
                         audio_q.put(None)
 
@@ -97,8 +196,12 @@ async def websocket_endpoint(ws: WebSocket):
                         pipeline.abort()
 
     except WebSocketDisconnect:
-        print("[WS] Client disconnected")
+        logger.info("[WS] Client disconnected")
         pipeline.abort()
     except Exception as e:
-        print(f"[WS] Error: {e}")
+        logger.error(f"[WS] Error: {e}")
         traceback.print_exc()
+    finally:
+        # Clean up GPU pipeline on disconnect if not shared
+        if MODE == "gpu" and pipeline is not _pipeline_instance:
+            pipeline.shutdown()

@@ -1,14 +1,23 @@
-# BlessVoice — Phase 1 (Pipeline Prototype)
-# Uses OpenAI APIs for STT/LLM/TTS
-openai>=1.0.0
+# BlessVoice — Python Dependencies
+# Install: pip install -r requirements.txt
+
+# === Core (both modes) ===
 fastapi>=0.115.0
 uvicorn[standard]>=0.34.0
 websockets>=12.0
 numpy>=1.26.0
 
-# Phase 2 dependencies (PersonaPlex on GPU) — uncomment when ready
-# torch>=2.1.0
-# torchaudio>=2.1.0
-# peft>=0.7.0          # LoRA fine-tuning
-# transformers>=4.36.0
-# accelerate>=0.25.0
+# === CPU Mode (Phase 1 — OpenAI API pipeline) ===
+openai>=1.0.0
+
+# === GPU Mode (Phase 2 — PersonaPlex + Llama) ===
+# Uncomment these when deploying to GPU server.
+# Install PersonaPlex: git clone https://github.com/NVIDIA/personaplex && cd personaplex && pip install -e .
+#
+# torch>=2.1.0                    # PyTorch with CUDA
+# torchaudio>=2.1.0               # Audio processing
+# transformers>=4.36.0            # HuggingFace model loading
+# accelerate>=0.25.0              # CPU offload support
+# huggingface_hub>=0.20.0         # Model download
+# llama-cpp-python>=0.3.0         # Llama 3.1 8B on CPU (GGUF)
+# peft>=0.7.0                     # LoRA fine-tuning (future)

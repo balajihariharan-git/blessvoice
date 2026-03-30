@@ -60,3 +60,8 @@ temp/
 # LoRA adapters (large, versioned separately)
 adapters/
 *-lora.bin
+
+# SSH keys — NEVER commit private keys
+*.pem
+infra/*.pem
+infra/*.pem.pub
