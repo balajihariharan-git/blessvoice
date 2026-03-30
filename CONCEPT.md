@@ -967,22 +967,236 @@ Or just click Start/Stop in the AWS web console. No terminal needed.
 | EBS disk (model + code) | 50 GB | **~$4/month** |
 | Compute | - | **$0** |
 
-### Smart Prototyping Progression
+### What is Spot vs On-Demand?
 
 ```
-Phase 1: Google Colab (FREE)
-  → Test PersonaPlex, validate quality
-  → $0 cost, sessions timeout after ~90 min
+On-Demand = Full price ticket. Guaranteed seat.        $1.00/hr
+Spot      = Standby ticket. Same GPU. 60-70% off.     $0.30/hr
+            But if AWS needs it back, 2-min warning and your instance stops.
+```
 
-Phase 2: AWS Spot Instance (CHEAP)
-  → 2-3 hours/day for serious testing
-  → g4dn.xlarge spot: ~$14/month + $4 storage
+| | On-Demand | Spot |
+|---|---|---|
+| Price | Full ($1.00/hr) | 60-70% off ($0.30/hr) |
+| Availability | Guaranteed, always | Usually available, rarely interrupted |
+| Interruption | Never | AWS can stop with 2-min warning |
+| Best for | Production (real users, 24/7) | Development/testing (can restart) |
+| Data loss on interrupt? | N/A | NO — disk is preserved, restart in 30 seconds |
+
+**For prototyping: Spot is perfect.** If interrupted, restart. Model weights on disk, nothing lost.
+**For production with real users: On-Demand.** Can't drop calls.
+
+### Full GPU Instance Comparison (Including A100)
+
+| Instance | GPU | VRAM | On-Demand/hr | Spot/hr | Spot 3hrs/day | What Fits |
+|----------|-----|------|-------------|---------|---------------|-----------|
+| g4dn.xlarge | T4 | 16GB | $0.526 | ~$0.16 | $14/mo | PersonaPlex only (shallow brain) |
+| **g5.xlarge** | **A10G** | **24GB** | $1.006 | ~$0.30 | **$27/mo** | **PersonaPlex + Llama 8B (RECOMMENDED)** |
+| g6.xlarge | L4 | 24GB | $0.805 | ~$0.24 | $22/mo | PersonaPlex + Llama 8B |
+| **g6e.xlarge** | **L40S** | **48GB** | $1.861 | ~$0.56 | **$50/mo** | **PersonaPlex + Llama 70B (near-Claude)** |
+| p4d.24xlarge | 8x A100 | 640GB | $32.77 | ~$10-15 | $900+/mo | Massive overkill. For training, not serving. |
+
+### Recommended Path
+
+```
+Phase 1: AWS g5.xlarge spot ($27/mo for 3hrs/day)
+  → PersonaPlex (12GB) + Llama 3.1 8B (6GB) = 18GB / 24GB
+  → Good intelligence, great voice, full-duplex
   → Start when working, stop when done
 
-Phase 3: Production
-  → Option A: AWS 24/7 (~$380/mo) for real users
-  → Option B: Buy RTX 3090 (~$500 one-time, then just electricity)
+Phase 2: If 8B brain isn't smart enough, upgrade to g6e.xlarge ($50/mo)
+  → PersonaPlex (12GB) + Llama 3.3 70B quantized (30GB) = 42GB / 48GB
+  → Near-Claude intelligence + great voice
+
+Phase 3: Production 24/7 for real users
+  → AWS on-demand ($725/mo) or buy RTX 3090 ($500 one-time)
 ```
+
+---
+
+## Hybrid Architecture: PersonaPlex (Voice) + Llama (Brain)
+
+### Why Hybrid?
+
+PersonaPlex is a **voice model, not a knowledge model.** It sounds human but doesn't know facts.
+
+```
+You ask: "What is the capital of France?"
+
+Claude Opus:   "Paris" (knows facts, reasons, thinks deeply)
+PersonaPlex:   *sounds human* but gives shallow/wrong answers
+               7B model trained on speech patterns, not knowledge
+```
+
+**PersonaPlex = incredible voice + mediocre brain.**
+**Llama 70B = incredible brain + no voice.**
+**BlessVoice = BOTH.**
+
+### The Architecture
+
+```
+┌─────────┐    ┌───────────────┐    ┌───────────────┐    ┌─────────┐
+│   You    │──→│  PersonaPlex  │──→│  Llama Brain  │──→│   You   │
+│  Speak   │    │  (VOICE)      │    │  (KNOWLEDGE)  │    │  Hear   │
+│          │    │               │    │               │    │         │
+│          │    │  Hears you    │    │  Thinks       │    │         │
+│          │    │  Speaks back  │    │  Reasons      │    │         │
+│          │    │  Full-duplex  │    │  Knows facts  │    │         │
+│          │    │  Emotion      │    │  Intelligence │    │         │
+└─────────┘    └───────────────┘    └───────────────┘    └─────────┘
+                  Voice Layer           Brain Layer
+                  (PersonaPlex)         (Llama 8B/70B)
+                  12 GB VRAM            6-30 GB VRAM
+```
+
+### What "Done" Looks Like
+
+```
+You open blessvoice.yourdomain.com on your phone.
+
+You say: "Explain quantum computing in simple terms"
+
+Within 1 second, a natural human voice responds:
+"Imagine you have a coin. In normal computing, it's either
+heads or tails. In quantum computing, it can be both at the
+same time until you look at it..."
+
+You interrupt: "Wait, give me a real world example"
+
+It IMMEDIATELY stops, listens, then responds:
+"Sure. Drug discovery is a great example. A normal computer
+tests molecules one by one. A quantum computer tests millions
+simultaneously..."
+
+The voice has natural pauses, emphasis, breathing.
+It knows as much as Claude or GPT.
+Running on YOUR server. $0 per conversation.
+```
+
+### Success Criteria
+
+| Criteria | Target | How We Measure |
+|----------|--------|----------------|
+| Real-time | < 1 second to first audio | Stopwatch |
+| Over internet | Works from any browser, anywhere | Test from phone |
+| Lightning fast | Full response in < 3 seconds | End-to-end timing |
+| Better voice | Sounds human, has emotion | Your ears |
+| Intelligent | Answers like Claude/GPT | Ask hard questions |
+| Full-duplex | Can interrupt mid-sentence | Talk over it |
+| English | Fluent, natural | Conversation test |
+| Always available | Works 24/7 from AWS | Uptime test |
+
+---
+
+## Llama: Who Owns It, Why It's Free, What They Get From You
+
+### Who Owns Llama?
+
+**Meta (Facebook/Instagram/WhatsApp).** Mark Zuckerberg's company.
+
+### Why Meta Gives Away a $100M+ Model for Free
+
+This is corporate strategy, not charity:
+
+```
+1. Meta spends $100-500M training Llama
+2. Meta releases it for FREE
+3. Millions of developers build on Llama
+4. Those developers DON'T build on OpenAI or Google
+5. OpenAI and Google lose developer ecosystem
+6. Meanwhile, Meta uses Llama internally for 3 BILLION users
+7. Meta saves BILLIONS by not paying OpenAI/Google API fees
+
+Cost to train Llama:              ~$500 million (one time)
+Cost if Meta used OpenAI for 3B users: ~$10-50 BILLION per year
+Meta's annual ad revenue:         $130 BILLION
+
+Giving away Llama costs 0.4% of revenue but saves billions.
+It's a billionaire giving away free sandwiches to kill the sandwich shop.
+```
+
+### The AI Industry Competitive Landscape
+
+| Company | Model | Strategy | Revenue Source |
+|---------|-------|----------|---------------|
+| OpenAI | GPT-4o, o1 | Closed, paid API | API fees ($billions/yr) |
+| Anthropic | Claude Opus/Sonnet | Closed, paid API | API fees + subscriptions |
+| Google | Gemini | Closed, paid API | Cloud revenue |
+| **Meta** | **Llama** | **Open, FREE** | Ads ($130B/yr) — doesn't need AI revenue |
+| Alibaba | Qwen | Open, FREE | Cloud revenue (same strategy as Meta) |
+| Mistral | Mistral | Open, FREE | Enterprise support contracts |
+| DeepSeek | DeepSeek | Open, FREE | Competing with US models |
+
+### What Meta Gets From You (Almost Nothing)
+
+```
+What Meta AUTOMATICALLY gets when you download Llama:
+└── A download count (anonymous). That's ALL.
+
+What Meta DOES NOT get:
+├── Your conversations ← NO
+├── Your users' data ← NO
+├── Your code ← NO
+├── Your LoRA adapters ← NO
+├── Your bug fixes ← NO (unless YOU choose to share)
+├── Access to your server ← NO
+└── Any telemetry or phone-home ← NO (it runs fully offline)
+```
+
+**The model runs ENTIRELY on your GPU. No internet connection needed after download. Zero data goes to Meta. Ever.**
+
+### "But What About Bug Reports and Community Contributions?"
+
+| Action | Does Meta See It? | Your Choice? |
+|--------|------------------|-------------|
+| You download Llama | Anonymous download count | Unavoidable |
+| You run Llama on your GPU | **NO** — fully offline | N/A |
+| You find a bug | **NO** — unless YOU report it on GitHub | 100% voluntary |
+| You fix a bug in THEIR code | **NO** — unless YOU submit a PR | 100% voluntary |
+| You fine-tune with LoRA | **NO** — stays on your server | N/A |
+| Your users talk to BlessVoice | **NO** — zero data to Meta | N/A |
+| You improve the model | **NO** — unless YOU publish it | 100% voluntary |
+
+**Meta benefits from volunteers who CHOOSE to share. You don't have to be one. The license explicitly allows taking and never giving back.**
+
+### How the Ecosystem Works
+
+```
+Meta releases Llama v3
+    │
+    ├── Researcher A finds bug, reports on GitHub (VOLUNTARY)
+    ├── Developer B shares faster code (VOLUNTARY)
+    ├── Company C fine-tunes for medical use, keeps PRIVATE (their right)
+    ├── YOU build BlessVoice, keep everything PRIVATE (your right)
+    │
+    Meta takes voluntary community feedback → builds Llama v4 (better)
+    │
+    YOU download Llama v4 for free (better model, $0, no obligation)
+```
+
+### The License in Plain English
+
+```
+Llama Community License:
+
+✅ You CAN: download, use, modify, fine-tune, sell products built on it
+✅ You CAN: keep all your work private forever
+✅ You CAN: never contribute anything back
+✅ You CAN: compete with Meta using their own model
+
+❌ You CANNOT: use it if you have 700M+ monthly users (only affects Google/TikTok)
+❌ You CANNOT: use "Llama" in your product name (call it BlessVoice)
+
+No hidden data collection. No phone-home. No strings.
+```
+
+### Why This Is Good for BlessVoice
+
+You are a BENEFICIARY of a corporate war between Meta, OpenAI, Google, and Anthropic.
+You pay nothing. You owe nothing. And the models keep getting better every 6-12 months.
+
+Your value is the APPLICATION — the voice experience, language support, cultural adaptation.
+Not the model. Models are becoming free commodities. Applications built on them are the business.
 
 ---
 
@@ -1031,26 +1245,35 @@ During Colab testing (Phase 1):
 
 ---
 
+## Decisions Made
+
+| Decision | Choice | Date |
+|----------|--------|------|
+| Base model | PersonaPlex (NVIDIA) | 2026-03-30 |
+| Brain/LLM | Llama 3.1 8B (upgrade to 70B if needed) | 2026-03-30 |
+| Cloud provider | AWS (skip Google Colab) | 2026-03-30 |
+| GPU instance | g5.xlarge (A10G 24GB) spot for dev, on-demand for prod | 2026-03-30 |
+| GitHub repo | balajihariharan-git/blessvoice | 2026-03-30 |
+
 ## Open Questions
 
 1. **Language priority**: English first, then Tamil? Hindi? What order?
 2. **Conversation domain**: General companion? Specific use case?
 3. **Voice persona**: Default personality? Multiple personas?
-4. **GPU procurement**: Colab (free test) → AWS spot (dev) → production?
-5. **Scale target**: How many simultaneous users for free service?
-6. **Data privacy**: How to handle voice data for LoRA training?
-7. **5-min limit**: Verify during Colab testing if PersonaPlex has this issue
+4. **Scale target**: How many simultaneous users for free service?
+5. **Data privacy**: How to handle voice data for LoRA training?
 
 ---
 
 ## Next Steps
 
-1. **Test PersonaPlex on Google Colab** (free T4 GPU) — validate voice quality + 5-min limit test
-2. **Compare with Moshi** side by side on same hardware
-3. **Decide GPU strategy**: Colab → AWS spot ($14/mo) → production
-4. **Build fine-tuning toolkit** for PersonaPlex (~3 days)
-5. **Fix 5-min limit** if present (sliding window, ~1 day)
-6. **LoRA fine-tune** for better English voice quality
-7. **Begin Tamil expansion** with Common Voice + IndicVoices + LoRA
-8. **Begin Hindi expansion** same approach
-9. **Launch free service**
+1. **Set up AWS g5.xlarge spot instance** — GPU ready for PersonaPlex + Llama
+2. **Download and serve PersonaPlex + Llama 8B** on AWS GPU
+3. **Build WebSocket bridge**: Browser ↔ PersonaPlex + Llama hybrid
+4. **Test full-duplex, interrupt handling, and 5-min session limit**
+5. **Fix 5-min limit** if present (sliding window buffer, ~1 day)
+6. **Build LoRA fine-tuning toolkit** for PersonaPlex (~3 days)
+7. **LoRA fine-tune** for better English voice quality
+8. **Begin Tamil expansion** with Common Voice + IndicVoices + LoRA
+9. **Begin Hindi expansion** same approach
+10. **Production deployment**: Docker, domain, 24/7 for real users
