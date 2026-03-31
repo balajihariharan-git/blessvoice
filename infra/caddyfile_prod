@@ -1,0 +1,21 @@
+voice.balajihariharan.com {
+    # Serve BlessVoice custom frontend for the main page
+    handle / {
+        root * /opt/blessvoice/web
+        file_server
+    }
+
+    # Proxy PersonaPlex API (WebSocket + REST)
+    handle /api/* {
+        reverse_proxy 127.0.0.1:8998 {
+            flush_interval -1
+        }
+    }
+
+    # Proxy PersonaPlex static assets (JS/CSS needed by their internal pages)
+    handle /assets/* {
+        reverse_proxy 127.0.0.1:8998 {
+            flush_interval -1
+        }
+    }
+}

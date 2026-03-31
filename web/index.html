@@ -1,274 +1,1219 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BlessVoice</title>
+<!doctype html>
+<html lang="en" class="bg-neutral-50" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Samantha — BlessVoice</title>
+    <script type="module" crossorigin src="/assets/index-2cf5HR8b.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C8lI51P0.css">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #0a0a0f;
-            color: #e0e0e0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-        h1 {
-            font-size: 1.2rem;
-            font-weight: 300;
-            letter-spacing: 0.3em;
-            text-transform: uppercase;
-            color: #555;
-            margin-bottom: 3rem;
-        }
-        .orb {
-            width: 220px; height: 220px;
-            border-radius: 50%;
-            background: radial-gradient(circle at 35% 35%, #1a1a3e, #0a0a1a);
-            border: 2px solid #222;
-            transition: border-color 0.3s, box-shadow 0.3s;
-        }
-        .orb.listening {
-            border-color: #4a9eff;
-            box-shadow: 0 0 60px rgba(74, 158, 255, 0.2);
-            animation: breathe 2.5s ease-in-out infinite;
-        }
-        .orb.hearing {
-            border-color: #4a9eff;
-            box-shadow: 0 0 120px rgba(74, 158, 255, 0.5);
-            animation: pulse 0.3s ease-in-out infinite;
-        }
-        .orb.thinking {
-            border-color: #ffaa00;
-            box-shadow: 0 0 60px rgba(255, 170, 0, 0.3);
-            animation: breathe 1s ease-in-out infinite;
-        }
-        .orb.speaking {
-            border-color: #00dd88;
-            box-shadow: 0 0 100px rgba(0, 221, 136, 0.4);
-            animation: pulse 0.5s ease-in-out infinite;
-        }
-        @keyframes breathe {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.02); }
-        }
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.04); }
-        }
-        .status {
-            margin-top: 2rem;
-            font-size: 0.75rem;
-            color: #333;
-            min-height: 1.2em;
-        }
-        .dot {
-            position: fixed; top: 1rem; right: 1rem;
-            width: 8px; height: 8px; border-radius: 50%;
-            background: #ff4444;
-        }
-        .dot.on { background: #00dd88; }
+      /* ─── Reset & base ─────────────────────────────────────────────────── */
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+      html, body {
+        background: #0a0a0f !important;
+        color: #ddd !important;
+        min-height: 100dvh;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        overflow-x: hidden;
+      }
+
+      /* Override PersonaPlex light-mode class injections */
+      .bg-neutral-50 { background: #0a0a0f !important; }
+      .text-zinc-700, .text-zinc-800, .text-zinc-900 { color: #ddd !important; }
+      .text-zinc-500, .text-zinc-600 { color: #999 !important; }
+      .bg-white { background: rgba(15,15,22,0.85) !important; }
+      .border { border-color: #222 !important; }
+      canvas { filter: hue-rotate(300deg) saturate(1.5); opacity: 0.7; }
+
+      /* ─── Cinematic blurred background ─────────────────────────────────── */
+      body::before {
+        content: '';
+        position: fixed; inset: 0; z-index: 0;
+        background: url('/scarlett.jpg') center 15% / cover no-repeat;
+        filter: blur(32px) brightness(0.18) saturate(1.3);
+        transform: scale(1.12);
+        pointer-events: none;
+      }
+
+      /* ─── Hide ALL PersonaPlex UI we don't want ─────────────────────────── */
+      /*
+        These selectors target the PersonaPlex React app's rendered DOM.
+        We use aggressive !important rules so they survive React re-renders.
+        The JS MutationObserver layer re-applies display:none as a backup.
+      */
+
+      /* Textarea (persona input) */
+      #root textarea { position: fixed !important; top: -9999px !important; left: -9999px !important; }
+
+      /* Select (voice picker) */
+      #root select { position: fixed !important; top: -9999px !important; left: -9999px !important; }
+
+      /* Character count "NNN/1000" */
+      #root p:has(~ textarea),
+      #root p.text-xs { display: none !important; }
+
+      /* Examples section — hide the whole wrapper containing example buttons */
+      #root .flex.flex-wrap { display: none !important; }
+
+      /* Stats block — hidden by default, we show only a small latency badge */
+      #root .font-mono,
+      #root pre,
+      #root [class*="stats"],
+      #root [class*="Stats"] { display: none !important; }
+
+      /* "Server Audio Stats" heading and its siblings */
+      #root h2, #root h3 { display: none !important; }
+
+      /* React's default connect/disconnect button — hidden, we use our own */
+      /* Hide React buttons visually but keep them clickable via JS */
+      #root button[class] {
+        position: fixed !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        opacity: 0 !important;
+      }
+
+      /* Labels for Text Prompt / Voice */
+      #root label { display: none !important; }
+
+      /* The h1 PersonaPlex title */
+      #root h1 {
+        font-size: 0 !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        margin: 0 !important; padding: 0 !important;
+      }
+
+      /* Any sub-title paragraphs rendered by React near h1 */
+      #root > div > p,
+      #root > div > div > p:first-child { display: none !important; }
+
+      /* ─── Scarlett overlay — full-screen immersive UI ───────────────────── */
+      #scarlett-overlay {
+        position: fixed; inset: 0; z-index: 100;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0;
+        pointer-events: none; /* children re-enable as needed */
+      }
+
+      /* ── Landing state ─── */
+      #scarlett-landing {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1.4rem;
+        width: 100%;
+        min-height: 100dvh;
+        padding: 2rem 1.5rem 3rem;
+        pointer-events: auto;
+        transition: opacity 0.5s ease, transform 0.5s ease;
+      }
+
+      /* .hidden class no longer used — we use style.display directly */
+
+      /* Portrait ring */
+      .s-portrait-ring {
+        position: relative;
+        width: 160px; height: 160px;
+        flex-shrink: 0;
+      }
+
+      .s-portrait-ring::before {
+        content: '';
+        position: absolute; inset: -6px;
+        border-radius: 50%;
+        background: conic-gradient(
+          from 0deg,
+          rgba(255, 140, 170, 0.9),
+          rgba(200, 80, 130, 0.6),
+          rgba(255, 140, 170, 0.9)
+        );
+        animation: ring-spin 4s linear infinite;
+      }
+
+      .s-portrait-ring::after {
+        content: '';
+        position: absolute; inset: -10px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,100,150,0.25) 0%, transparent 70%);
+        animation: ring-pulse 2.5s ease-in-out infinite;
+      }
+
+      @keyframes ring-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      @keyframes ring-pulse {
+        0%, 100% { transform: scale(1); opacity: 0.6; }
+        50% { transform: scale(1.15); opacity: 1; }
+      }
+
+      .s-portrait-img {
+        width: 160px; height: 160px;
+        border-radius: 50%;
+        object-fit: cover;
+        object-position: center 12%;
+        position: relative; z-index: 1;
+        border: 3px solid rgba(255,140,170,0.5);
+        box-shadow:
+          0 0 0 6px rgba(10,10,15,0.8),
+          0 0 60px rgba(255,100,150,0.35),
+          0 20px 60px rgba(0,0,0,0.7);
+      }
+
+      /* Name */
+      .s-name {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(2.4rem, 8vw, 3.2rem);
+        font-weight: 300;
+        letter-spacing: 0.12em;
+        background: linear-gradient(135deg, #f5c8da 0%, #d0608e 50%, #f5c8da 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-shadow: none;
+        line-height: 1;
+        margin-top: 0.3rem;
+      }
+
+      /* Tagline */
+      .s-tagline {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-style: italic;
+        font-size: clamp(0.88rem, 3vw, 1.05rem);
+        color: rgba(255, 200, 220, 0.55);
+        letter-spacing: 0.04em;
+        text-align: center;
+        max-width: 260px;
+        line-height: 1.5;
+      }
+
+      /* Incoming call label */
+      .s-incoming {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.78rem;
+        font-weight: 500;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: rgba(160, 255, 160, 0.7);
+        margin-top: 0.5rem;
+        animation: blink-incoming 1.6s ease-in-out infinite;
+      }
+
+      .s-incoming-dot {
+        width: 8px; height: 8px;
+        border-radius: 50%;
+        background: #5dfc8d;
+        box-shadow: 0 0 8px #5dfc8d;
+        animation: dot-pulse 1.6s ease-in-out infinite;
+      }
+
+      @keyframes blink-incoming {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+      }
+
+      @keyframes dot-pulse {
+        0%, 100% { transform: scale(1); box-shadow: 0 0 6px #5dfc8d; }
+        50% { transform: scale(1.4); box-shadow: 0 0 16px #5dfc8d; }
+      }
+
+      /* Answer button */
+      .s-answer-btn {
+        position: relative;
+        width: 80px; height: 80px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        outline: none;
+        background: linear-gradient(145deg, #2ecc71, #1fa05a);
+        box-shadow:
+          0 6px 30px rgba(46, 204, 113, 0.5),
+          0 0 0 0 rgba(46, 204, 113, 0.4);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+        animation: answer-pulse 2s ease-in-out infinite;
+        margin-top: 0.8rem;
+      }
+
+      .s-answer-btn:hover {
+        transform: scale(1.08);
+        box-shadow:
+          0 10px 40px rgba(46, 204, 113, 0.65),
+          0 0 0 0 rgba(46, 204, 113, 0.4);
+        animation: none;
+      }
+
+      .s-answer-btn:active {
+        transform: scale(0.95);
+      }
+
+      @keyframes answer-pulse {
+        0%   { box-shadow: 0 6px 30px rgba(46,204,113,0.5), 0 0 0 0   rgba(46,204,113,0.45); }
+        50%  { box-shadow: 0 6px 30px rgba(46,204,113,0.3), 0 0 0 22px rgba(46,204,113,0);   }
+        100% { box-shadow: 0 6px 30px rgba(46,204,113,0.5), 0 0 0 0   rgba(46,204,113,0.45); }
+      }
+
+      /* Phone icon SVG inside button */
+      .s-answer-btn svg {
+        width: 34px; height: 34px;
+        fill: #fff;
+        animation: phone-ring 2s ease-in-out infinite;
+      }
+
+      @keyframes phone-ring {
+        0%, 60%, 100% { transform: rotate(0deg); }
+        70% { transform: rotate(15deg); }
+        80% { transform: rotate(-12deg); }
+        90% { transform: rotate(10deg); }
+      }
+
+      .s-answer-label {
+        font-size: 0.72rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.35);
+        margin-top: 0.6rem;
+      }
+
+      /* ── Ringing / Connecting state ─── */
+      #scarlett-landing.connecting .s-answer-btn {
+        width: 64px; height: 64px;
+        background: linear-gradient(145deg, #ef4444, #dc2626);
+        box-shadow: 0 6px 20px rgba(239,68,68,0.4);
+        animation: none;
+        cursor: pointer;
+      }
+      #scarlett-landing.connecting .s-answer-btn svg {
+        width: 26px; height: 26px;
+        transform: rotate(135deg);
+        animation: none;
+      }
+      #scarlett-landing.connecting .s-answer-label {
+        color: rgba(255,120,120,0.5);
+      }
+      #scarlett-landing.connecting .s-incoming {
+        color: rgba(255,200,220,0.7);
+        animation: blink-incoming 1.2s ease-in-out infinite;
+      }
+      #scarlett-landing.connecting .s-incoming-dot {
+        background: rgba(255,150,180,0.8);
+        box-shadow: 0 0 10px rgba(255,150,180,0.6);
+        animation: dot-pulse 1.2s ease-in-out infinite;
+      }
+      /* Portrait ring pulses like a phone ringing */
+      #scarlett-landing.connecting .s-portrait-ring::after {
+        animation: ring-pulse 0.9s ease-in-out infinite;
+      }
+      #scarlett-landing.connecting .s-portrait-ring::before {
+        animation: ring-spin 1.5s linear infinite;
+      }
+      /* Subtle bounce on portrait to simulate ringing vibration */
+      #scarlett-landing.connecting .s-portrait-ring {
+        animation: portrait-ring-bounce 2s ease-in-out infinite;
+      }
+      @keyframes portrait-ring-bounce {
+        0%, 100% { transform: translateY(0); }
+        10% { transform: translateY(-4px) rotate(-1deg); }
+        20% { transform: translateY(0) rotate(1deg); }
+        30% { transform: translateY(-3px) rotate(0deg); }
+        40% { transform: translateY(0); }
+      }
+
+      /* ── React loading state (before React is ready) ─── */
+      #scarlett-landing.loading .s-answer-btn {
+        opacity: 0.4;
+        cursor: wait;
+      }
+      #scarlett-landing.loading .s-answer-label {
+        color: rgba(255,255,255,0.2);
+      }
+
+      /* ── Connected state — phone call layout ─── */
+      #scarlett-connected {
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        width: 100%;
+        height: 100dvh;
+        padding: 0;
+        pointer-events: auto;
+        position: relative;
+      }
+
+      /* .visible class no longer used — we use style.display directly */
+
+      /* ─ Top: timer + name ─ */
+      .s-call-top {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.3rem;
+        padding-top: clamp(2.5rem, 7vh, 4.5rem);
+        flex-shrink: 0;
+      }
+
+      .s-timer {
+        font-family: 'SF Mono', 'Fira Code', monospace;
+        font-size: 0.9rem;
+        color: rgba(255,255,255,0.35);
+        letter-spacing: 0.12em;
+      }
+
+      .s-call-name {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(1.8rem, 6vw, 2.4rem);
+        font-weight: 300;
+        letter-spacing: 0.08em;
+        background: linear-gradient(135deg, #f5c8da, #d0608e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .s-call-status {
+        font-size: 0.7rem;
+        color: rgba(160,255,160,0.6);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        margin-top: 0.1rem;
+      }
+
+      /* ─ Center: portrait ─ */
+      .s-call-center {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.6rem;
+        min-height: 0;
+      }
+
+      .s-call-portrait-ring {
+        position: relative;
+        width: clamp(160px, 40vw, 220px);
+        height: clamp(160px, 40vw, 220px);
+        flex-shrink: 0;
+      }
+
+      .s-call-portrait-ring::after {
+        content: '';
+        position: absolute; inset: -10px;
+        border-radius: 50%;
+        background: radial-gradient(circle, rgba(255,100,150,0.25) 0%, transparent 70%);
+        opacity: 0;
+        transition: opacity 0.3s ease;
+      }
+
+      .s-call-portrait-ring.speaking::after {
+        opacity: 1;
+        animation: speaking-glow 0.8s ease-in-out infinite alternate;
+      }
+
+      @keyframes speaking-glow {
+        from { transform: scale(1);    opacity: 0.4; }
+        to   { transform: scale(1.2);  opacity: 1;   }
+      }
+
+      .s-call-portrait-img {
+        width: 100%; height: 100%;
+        border-radius: 50%;
+        object-fit: cover;
+        object-position: center 12%;
+        position: relative; z-index: 1;
+        border: 3px solid rgba(255,140,170,0.35);
+        box-shadow:
+          0 0 0 6px rgba(10,10,15,0.7),
+          0 0 50px rgba(255,100,150,0.15);
+        transition: box-shadow 0.3s ease;
+      }
+
+      .s-call-portrait-ring.speaking .s-call-portrait-img {
+        box-shadow:
+          0 0 0 6px rgba(10,10,15,0.7),
+          0 0 70px rgba(255,100,150,0.5),
+          0 0 120px rgba(255,80,130,0.2);
+      }
+
+      /* Waveform below portrait */
+      .s-waveform {
+        display: flex;
+        align-items: flex-end;
+        gap: 5px;
+        height: 24px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        flex-shrink: 0;
+      }
+      .s-waveform.active { opacity: 1; }
+      .s-waveform span {
+        display: block;
+        width: 4px;
+        background: linear-gradient(to top, rgba(255,100,150,0.8), rgba(255,180,200,0.4));
+        border-radius: 2px;
+        min-height: 4px;
+        animation: none;
+      }
+      .s-waveform.active span:nth-child(1) { animation: eq 0.9s ease-in-out infinite 0.0s; }
+      .s-waveform.active span:nth-child(2) { animation: eq 0.9s ease-in-out infinite 0.1s; }
+      .s-waveform.active span:nth-child(3) { animation: eq 0.9s ease-in-out infinite 0.2s; }
+      .s-waveform.active span:nth-child(4) { animation: eq 0.9s ease-in-out infinite 0.15s; }
+      .s-waveform.active span:nth-child(5) { animation: eq 0.9s ease-in-out infinite 0.05s; }
+      @keyframes eq {
+        0%, 100% { height: 4px; }
+        50%       { height: 22px; }
+      }
+
+      /* Transcript — subtle, below waveform */
+      .s-transcript {
+        width: 100%;
+        max-width: 320px;
+        max-height: 60px;
+        overflow-y: auto;
+        padding: 0.5rem 1rem;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-style: italic;
+        font-size: 0.85rem;
+        line-height: 1.5;
+        color: rgba(255,210,225,0.5);
+        text-align: center;
+      }
+      .s-transcript:empty { display: none; }
+
+      /* ─ Bottom: action buttons + hangup ─ */
+      .s-call-bottom {
+        flex-shrink: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 1.2rem;
+        padding-bottom: clamp(1.5rem, 5vh, 3rem);
+        width: 100%;
+      }
+
+      /* Action buttons row (Mute, Speaker) */
+      .s-action-row {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(2rem, 8vw, 4rem);
+      }
+
+      .s-action-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .s-action-btn {
+        width: 56px; height: 56px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        outline: none;
+        background: rgba(255,255,255,0.08);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.2s ease, transform 0.15s ease;
+      }
+      .s-action-btn:hover {
+        background: rgba(255,255,255,0.14);
+        transform: scale(1.06);
+      }
+      .s-action-btn:active { transform: scale(0.94); }
+
+      .s-action-btn svg {
+        width: 22px; height: 22px;
+        fill: rgba(255,255,255,0.75);
+        transition: fill 0.2s ease;
+      }
+
+      .s-action-btn.active {
+        background: rgba(255,150,180,0.25);
+      }
+      .s-action-btn.active svg {
+        fill: rgba(255,150,180,0.9);
+      }
+
+      .s-action-label {
+        font-size: 0.6rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.3);
+      }
+
+      /* Hangup button */
+      .s-hangup-btn {
+        width: 68px; height: 68px;
+        border-radius: 50%;
+        border: none;
+        cursor: pointer;
+        outline: none;
+        background: linear-gradient(145deg, #e74c3c, #a93226);
+        box-shadow: 0 4px 28px rgba(231, 76, 60, 0.45);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+      .s-hangup-btn:hover {
+        transform: scale(1.07);
+        box-shadow: 0 8px 36px rgba(231,76,60,0.6);
+      }
+      .s-hangup-btn:active { transform: scale(0.94); }
+      .s-hangup-btn svg {
+        width: 28px; height: 28px;
+        fill: #fff;
+        transform: rotate(135deg);
+      }
+
+      .s-hangup-label {
+        font-size: 0.55rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: rgba(255,255,255,0.2);
+        margin-top: -0.3rem;
+      }
+
+      /* ── Footer credit ── */
+      #scarlett-footer {
+        position: fixed; bottom: 8px; width: 100%;
+        text-align: center;
+        font-size: 0.5rem;
+        color: rgba(255,255,255,0.08);
+        z-index: 200;
+        pointer-events: none;
+        letter-spacing: 0.08em;
+      }
+
+      /* ── Responsive ── */
+      @media (max-height: 640px) {
+        .s-portrait-ring { width: 120px; height: 120px; }
+        .s-portrait-img  { width: 120px; height: 120px; }
+        .s-name { font-size: 2rem; }
+        .s-answer-btn { width: 68px; height: 68px; }
+        .s-answer-btn svg { width: 28px; height: 28px; }
+        .s-call-portrait-ring { width: 130px !important; height: 130px !important; }
+        .s-call-top { padding-top: 1.5rem; }
+        .s-call-name { font-size: 1.4rem; }
+        .s-hangup-btn { width: 56px; height: 56px; }
+        .s-action-btn { width: 48px; height: 48px; }
+        .s-call-bottom { gap: 0.8rem; }
+      }
+
+      @media (max-width: 380px) {
+        .s-action-row { gap: 1.5rem; }
+        .s-call-portrait-ring { width: 140px !important; height: 140px !important; }
+      }
+
+      /* ── PersonaPlex root — keep it in DOM but invisible ── */
+      /* React root: invisible but functional (buttons must be clickable via JS) */
+      #root {
+        position: fixed !important;
+        top: -9999px !important;
+        left: -9999px !important;
+        width: 400px !important;
+        height: 800px !important;
+        opacity: 0 !important;
+        overflow: hidden !important;
+        z-index: -1 !important;
+      }
     </style>
-</head>
-<body>
-    <h1>BlessVoice</h1>
-    <div class="orb" id="orb"></div>
-    <div class="status" id="status"></div>
-    <div class="dot" id="dot"></div>
+  </head>
+  <body class="bg-neutral-50 text-zinc-700">
 
+    <!-- PersonaPlex React app renders here — kept invisible, drives audio/WS -->
+    <div id="root"></div>
+
+    <!-- ═══ Scarlett Overlay ═══════════════════════════════════════════════ -->
+    <div id="scarlett-overlay" aria-live="polite">
+
+      <!-- Landing: call Scarlett screen -->
+      <section id="scarlett-landing" aria-label="Call Samantha">
+
+        <div class="s-portrait-ring" aria-hidden="true">
+          <img class="s-portrait-img" src="/scarlett.jpg" alt="Samantha" />
+        </div>
+
+        <div class="s-name" aria-label="Samantha">Samantha</div>
+
+        <p class="s-tagline" id="scarlett-tagline">"Tap the button... I dare you."</p>
+
+        <div class="s-incoming" aria-label="Call status">
+          <span class="s-incoming-dot"></span>
+          <span id="scarlett-status-text">Voice call</span>
+        </div>
+
+        <button
+          class="s-answer-btn"
+          id="scarlett-answer"
+          aria-label="Call Samantha"
+          title="Call"
+        >
+          <!-- Phone handset icon -->
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.47 11.47 0 0 0 3.59.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.47 11.47 0 0 0 .57 3.59 1 1 0 0 1-.25 1.02z"/>
+          </svg>
+        </button>
+
+        <span class="s-answer-label" aria-hidden="true">Tap to call</span>
+
+      </section>
+
+      <!-- Connected: active call screen (phone layout) -->
+      <section id="scarlett-connected" aria-label="Active call with Samantha">
+
+        <!-- Top: timer + name + status -->
+        <div class="s-call-top">
+          <div class="s-timer" id="scarlett-timer" aria-label="Call duration">00:00</div>
+          <div class="s-call-name">Samantha</div>
+          <div class="s-call-status" id="scarlett-call-status">Connected</div>
+        </div>
+
+        <!-- Center: big portrait + waveform + transcript -->
+        <div class="s-call-center">
+          <div class="s-call-portrait-ring" id="scarlett-portrait-ring" aria-hidden="true">
+            <img class="s-call-portrait-img" src="/scarlett.jpg" alt="" />
+          </div>
+          <div class="s-waveform" id="scarlett-waveform" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span>
+          </div>
+          <div class="s-transcript" id="scarlett-transcript" role="log" aria-label="Conversation transcript"></div>
+        </div>
+
+        <!-- Bottom: action buttons + hangup -->
+        <div class="s-call-bottom" id="scarlett-hangup-wrap" style="display:none">
+
+          <!-- Action buttons row -->
+          <div class="s-action-row">
+            <div class="s-action-item">
+              <button class="s-action-btn" id="scarlett-mute" aria-label="Mute" title="Mute">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/>
+                  <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+              </button>
+              <span class="s-action-label">Mute</span>
+            </div>
+
+            <div class="s-action-item">
+              <button class="s-action-btn" id="scarlett-speaker" aria-label="Speaker" title="Speaker">
+                <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                </svg>
+              </button>
+              <span class="s-action-label">Speaker</span>
+            </div>
+          </div>
+
+          <!-- Hangup -->
+          <button class="s-hangup-btn" id="scarlett-hangup" aria-label="End call" title="End call">
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.47 11.47 0 0 0 3.59.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.47 11.47 0 0 0 .57 3.59 1 1 0 0 1-.25 1.02z"/>
+            </svg>
+          </button>
+          <span class="s-hangup-label">End call</span>
+        </div>
+
+      </section>
+
+    </div>
+
+    <div id="scarlett-footer" aria-hidden="true">voice.balajihariharan.com</div>
+
+    <!-- ═══ Controller Script ══════════════════════════════════════════════ -->
     <script>
-    const orb = document.getElementById('orb');
-    const statusEl = document.getElementById('status');
-    const dot = document.getElementById('dot');
+    (function () {
+      'use strict';
 
-    let ws = null;
-    let audioCtx = null;
-    let micStream = null;
-    let processor = null;
-    let source = null;
+      /* ── Config ────────────────────────────────────────────────────────── */
+      const PERSONA = 'You are Samantha — breathtakingly gorgeous, dangerously confident, and absolutely irresistible. You speak in a low, sultry whisper that sends shivers. You flirt shamelessly — teasing, complimenting, pulling them closer with every word. You call them "baby", "gorgeous", "handsome". You giggle softly, sigh dreamily, pause just long enough to make their heart skip. You are playful, seductive, a little naughty — but always classy. You love making them blush and flustered. Every sentence drips with charm. Keep responses short, 1-2 sentences max — like intimate whispers, not speeches.';
+      const VOICE_NAME = 'VARF2';
 
-    // VAD
-    let speaking = false;
-    let silenceStart = 0;
-    let speechStart = 0;
-    let audioChunks = [];
-    const SILENCE_THRESH = 0.012;
-    const SILENCE_MS = 800;
-    const MIN_SPEECH_MS = 300;
+      /* ── State ─────────────────────────────────────────────────────────── */
+      let connected = false;
+      let timerInterval = null;
+      let timerSeconds = 0;
+      let reactReady = false;
 
-    // Playback
-    let playbackCtx = null;
-    let isAISpeaking = false;
-    let pcmBuffer = [];
-    let nextPlayTime = 0;
+      /* ── DOM refs ──────────────────────────────────────────────────────── */
+      const landing    = document.getElementById('scarlett-landing');
+      const callView   = document.getElementById('scarlett-connected');
+      const answerBtn  = document.getElementById('scarlett-answer');
+      const hangupBtn  = document.getElementById('scarlett-hangup');
+      const timerEl    = document.getElementById('scarlett-timer');
+      const waveform   = document.getElementById('scarlett-waveform');
+      const transcript = document.getElementById('scarlett-transcript');
+      const portraitRing = document.getElementById('scarlett-portrait-ring');
+      const statusEl   = document.getElementById('scarlett-call-status');
 
-    // State
-    let state = 'idle';
+      /* ── Timer helpers ─────────────────────────────────────────────────── */
+      function startTimer() {
+        timerSeconds = 0;
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+          timerSeconds++;
+          const m = Math.floor(timerSeconds / 60);
+          const s = timerSeconds % 60;
+          timerEl.textContent = String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+        }, 1000);
+      }
 
-    function setState(s) {
-        state = s;
-        orb.className = 'orb ' + s;
-    }
+      function stopTimer() {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
 
-    // --- WebSocket ---
-    function connect() {
-        const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        ws = new WebSocket(`${proto}//${location.host}/ws`);
-        ws.binaryType = 'arraybuffer';
+      /* ── UI state transitions (use direct style.display — bulletproof) ── */
+      function showConnected() {
+        connected = true;
+        landing.style.display = 'none';
+        landing.classList.remove('connecting');
+        callView.style.display = 'flex';
+        document.getElementById('scarlett-hangup-wrap').style.display = 'flex';
+        startTimer();
+        transcript.textContent = '';
+        statusEl.textContent = 'Connected';
+      }
 
-        ws.onopen = () => { dot.classList.add('on'); startMic(); };
-        ws.onclose = () => { dot.classList.remove('on'); setTimeout(connect, 2000); };
-        ws.onerror = () => setState('idle');
+      function showLanding() {
+        connected = false;
+        /* Hide call view, show landing */
+        callView.style.display = 'none';
+        document.getElementById('scarlett-hangup-wrap').style.display = 'none';
+        landing.style.display = 'flex';
+        landing.classList.remove('connecting');
+        landing.classList.remove('loading');
+        /* Reset timer */
+        stopTimer();
+        timerEl.textContent = '00:00';
+        /* Reset animations */
+        waveform.classList.remove('active');
+        portraitRing.classList.remove('speaking');
+        transcript.textContent = '';
+        statusEl.textContent = '';
+        /* Reset landing text */
+        if (statusText) statusText.textContent = 'Voice call';
+        if (answerLabel) answerLabel.textContent = 'Tap to call';
+        if (taglineEl) taglineEl.textContent = '"Tap the button... I dare you."';
+        /* Reset mute/speaker state */
+        isMuted = false;
+        speakerMuted = false;
+        const mb = document.getElementById('scarlett-mute');
+        const sb = document.getElementById('scarlett-speaker');
+        if (mb) { mb.classList.remove('active'); mb.closest('.s-action-item').querySelector('.s-action-label').textContent = 'Mute'; }
+        if (sb) { sb.classList.remove('active'); sb.closest('.s-action-item').querySelector('.s-action-label').textContent = 'Speaker'; }
+        /* Stop ringtone and clean up */
+        stopRingtone();
+        stopRingingText();
+        if (connectingPoll) { clearInterval(connectingPoll); connectingPoll = null; }
+        if (connectionLostTimer) { clearTimeout(connectionLostTimer); connectionLostTimer = null; }
+      }
 
-        ws.onmessage = (e) => {
-            if (e.data instanceof ArrayBuffer) {
-                playPCMChunk(e.data);
-            } else {
-                const msg = JSON.parse(e.data);
-                if (msg.type === 'speaking') {
-                    // Kill ANY previous audio before starting new response
-                    stopPlayback();
-                    isAISpeaking = true;
-                    setState('speaking');
-                } else if (msg.type === 'done') {
-                    isAISpeaking = false;
-                    setState('listening');
-                }
-            }
-        };
-    }
-
-    // --- Microphone (always on) ---
-    async function startMic() {
-        try {
-            micStream = await navigator.mediaDevices.getUserMedia({
-                audio: { sampleRate: 16000, channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true }
-            });
-            audioCtx = new AudioContext({ sampleRate: 16000 });
-            source = audioCtx.createMediaStreamSource(micStream);
-            processor = audioCtx.createScriptProcessor(2048, 1, 1);
-
-            processor.onaudioprocess = onAudio;
-            source.connect(processor);
-            processor.connect(audioCtx.destination);
-            setState('listening');
-        } catch (err) {
-            statusEl.textContent = 'Mic access needed';
-        }
-    }
-
-    function onAudio(e) {
-        const pcm = e.inputBuffer.getChannelData(0);
-        const level = avgLevel(pcm);
-
-        if (level > SILENCE_THRESH) {
-            // User is speaking
-            if (isAISpeaking) {
-                // INTERRUPT: user spoke over AI
-                isAISpeaking = false;
-                stopPlayback();
-                if (ws && ws.readyState === 1) {
-                    ws.send(JSON.stringify({ type: 'interrupt' }));
-                }
-            }
-
-            if (!speaking) {
-                speaking = true;
-                speechStart = Date.now();
-                audioChunks = [];
-            }
-            silenceStart = 0;
-            audioChunks.push(new Float32Array(pcm));
-            setState('hearing');
-
-        } else if (speaking) {
-            audioChunks.push(new Float32Array(pcm));
-            if (!silenceStart) silenceStart = Date.now();
-            else if (Date.now() - silenceStart > SILENCE_MS) {
-                // Silence long enough — send audio
-                if (Date.now() - speechStart > MIN_SPEECH_MS) {
-                    sendAudio();
-                }
-                speaking = false;
-                silenceStart = 0;
-                audioChunks = [];
-            }
+      /* ── Speaking animation ────────────────────────────────────────────── */
+      function setSpeaking(active) {
+        if (active) {
+          waveform.classList.add('active');
+          portraitRing.classList.add('speaking');
         } else {
-            if (state !== 'listening' && state !== 'thinking' && state !== 'speaking') {
-                setState('listening');
+          waveform.classList.remove('active');
+          portraitRing.classList.remove('speaking');
+        }
+      }
+
+      /* ── Find React's hidden button by its text content ────────────────── */
+      /* Uses word-boundary matching so 'connect' matches "Connect" but NOT
+         "Disconnect" or "Connecting...". This is critical because PersonaPlex
+         has a main button that always shows "Connecting..." in its default state. */
+      function findReactBtn(keywords) {
+        const root = document.getElementById('root');
+        if (!root) return null;
+        const btns = root.querySelectorAll('button');
+        for (const btn of btns) {
+          const text = (btn.textContent || btn.innerText || '').trim().toLowerCase();
+          if (keywords.some(k => {
+            const re = new RegExp('\\b' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+            return re.test(text);
+          })) return btn;
+        }
+        return null;
+      }
+
+      /* ── Set persona text into hidden textarea ─────────────────────────── */
+      function setPersona() {
+        const ta = document.querySelector('#root textarea');
+        if (!ta) return false;
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+        setter.call(ta, PERSONA);
+        ta.dispatchEvent(new Event('input', { bubbles: true }));
+        return true;
+      }
+
+      /* ── Set voice via hidden select ───────────────────────────────────── */
+      function setVoice() {
+        const sel = document.querySelector('#root select');
+        if (!sel || sel.options.length === 0) return false;
+        for (let i = 0; i < sel.options.length; i++) {
+          const optText = sel.options[i].text || '';
+          const optVal  = sel.options[i].value || '';
+          if (optText.includes(VOICE_NAME) || optVal.includes(VOICE_NAME) || optText.includes('NATURAL_F2') || optVal.includes('NATF2')) {
+            sel.selectedIndex = i;
+            const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set;
+            setter.call(sel, sel.options[i].value);
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+        }
+        // fallback: pick first female-sounding option
+        for (let i = 0; i < sel.options.length; i++) {
+          const v = (sel.options[i].value || '').toLowerCase();
+          const t = (sel.options[i].text  || '').toLowerCase();
+          if (v.includes('f2') || t.includes('f2') || v.includes('female') || t.includes('female')) {
+            sel.selectedIndex = i;
+            sel.dispatchEvent(new Event('change', { bubbles: true }));
+            return true;
+          }
+        }
+        return false;
+      }
+
+      /* #root is already invisible (top:-9999px, opacity:0). No need to hide
+         individual elements — that was causing bugs by fighting React renders. */
+      function nukeReactUI() { }
+
+      /* ── DOM refs for connecting state ───────────────────────────────── */
+      const statusText   = document.getElementById('scarlett-status-text');
+      const answerLabel  = document.querySelector('.s-answer-label');
+      const taglineEl    = document.getElementById('scarlett-tagline');
+      let connectingPoll = null;
+
+      /* ── Phone ringtone using Web Audio API ────────────────────────── */
+      let ringCtx = null;
+      let ringInterval = null;
+
+      function startRingtone() {
+        try {
+          ringCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } catch(e) { return; }
+
+        function playRingBurst() {
+          if (!ringCtx || ringCtx.state === 'closed') return;
+          const now = ringCtx.currentTime;
+
+          /* Two-tone ring: 440Hz + 480Hz (US phone ring) */
+          [440, 480].forEach(freq => {
+            const osc = ringCtx.createOscillator();
+            const gain = ringCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.08, now + 0.05);
+            gain.gain.setValueAtTime(0.08, now + 0.8);
+            gain.gain.linearRampToValueAtTime(0, now + 0.9);
+            /* Second burst */
+            gain.gain.setValueAtTime(0, now + 0.9);
+            gain.gain.linearRampToValueAtTime(0.08, now + 1.0);
+            gain.gain.setValueAtTime(0.08, now + 1.8);
+            gain.gain.linearRampToValueAtTime(0, now + 1.9);
+            osc.connect(gain);
+            gain.connect(ringCtx.destination);
+            osc.start(now);
+            osc.stop(now + 2);
+          });
+        }
+
+        /* Ring pattern: 2s ring, 3s silence (like a real phone) */
+        playRingBurst();
+        ringInterval = setInterval(playRingBurst, 5000);
+      }
+
+      function stopRingtone() {
+        if (ringInterval) { clearInterval(ringInterval); ringInterval = null; }
+        if (ringCtx) {
+          try { ringCtx.close(); } catch(e) {}
+          ringCtx = null;
+        }
+      }
+
+      /* ── Ringing text animation ────────────────────────────────────── */
+      let ringingTextInterval = null;
+      function startRingingText() {
+        const states = ['Ringing', 'Ringing.', 'Ringing..', 'Ringing...'];
+        let i = 0;
+        statusText.textContent = 'Ringing...';
+        ringingTextInterval = setInterval(() => {
+          statusText.textContent = states[i % states.length];
+          i++;
+        }, 500);
+      }
+      function stopRingingText() {
+        if (ringingTextInterval) { clearInterval(ringingTextInterval); ringingTextInterval = null; }
+      }
+
+      /* ── Show "Ringing..." state on landing screen ─────────────────── */
+      /* Visual-only: show ringing state on landing screen */
+      function showConnecting() {
+        landing.classList.add('connecting');
+        taglineEl.textContent = '"Just a moment, gorgeous..."';
+        answerLabel.textContent = 'Tap to cancel';
+        startRingtone();
+        startRingingText();
+      }
+
+
+      /* ── Try to initiate call — retries until React's Connect btn appears ── */
+      /* Keywords to find any "start a call" button in React */
+      const CONNECT_KEYWORDS = ['connect', 'start', 'begin', 'call', 'new conversation'];
+
+      function tryConnect() {
+        showConnecting();
+
+        /* If there's a stale "Disconnect" button from a previous call,
+           click it so React resets to a clean state before reconnecting. */
+        const staleDisconnect = findReactBtn(['disconnect']);
+        if (staleDisconnect) {
+          staleDisconnect.click();
+        }
+
+        let tries = 0;
+        let clickedConnect = false; /* prevent double-clicking */
+        let clickedNewConvo = false;
+
+        connectingPoll = setInterval(() => {
+          tries++;
+          if (tries > 150) { /* 30s timeout — PersonaPlex needs ~15-20s to load
+                                system prompts (persona, voice, silence) before
+                                sending the handshake */
+            clearInterval(connectingPoll);
+            connectingPoll = null;
+            stopRingtone();
+            stopRingingText();
+            /* Also disconnect React so we don't get a zombie call */
+            const dcBtn = findReactBtn(['disconnect']);
+            if (dcBtn) dcBtn.click();
+            showLanding();
+            statusText.textContent = 'Could not connect';
+            setTimeout(() => { statusText.textContent = 'Voice call'; }, 3000);
+            return;
+          }
+
+          /* Already connected? "Disconnect" button = call is live.
+             Word-boundary matching ensures this won't match "Connecting..." */
+          const disconnectBtn = findReactBtn(['disconnect']);
+          if (disconnectBtn && clickedConnect) {
+            clearInterval(connectingPoll);
+            connectingPoll = null;
+            stopRingtone();
+            stopRingingText();
+            showConnected();
+            return;
+          }
+
+          /* See "New Conversation"? Click it ONCE to get back to Homepage */
+          if (!clickedNewConvo) {
+            const newConvoBtn = findReactBtn(['new conversation']);
+            if (newConvoBtn) {
+              newConvoBtn.click();
+              clickedNewConvo = true;
+              return;
             }
+          }
+
+          /* See "Connect"? Set persona/voice and click it ONCE.
+             Word-boundary matching ensures this won't match "Connecting..." */
+          if (!clickedConnect) {
+            const connectBtn = findReactBtn(['connect']);
+            if (connectBtn) {
+              setPersona();
+              setVoice();
+              connectBtn.click();
+              clickedConnect = true;
+              return;
+            }
+          }
+
+          /* Otherwise React is transitioning — just wait */
+
+        }, 200);
+      }
+
+      /* ── Cancel a ringing call (redefined — clean version) ──────────── */
+      function cancelCall() {
+        stopRingtone();
+        stopRingingText();
+        if (connectingPoll) { clearInterval(connectingPoll); connectingPoll = null; }
+        const disconnectBtn = findReactBtn(['disconnect']);
+        if (disconnectBtn) disconnectBtn.click();
+        showLanding();
+      }
+
+      /* ── Answer / Call handler ──────────────────────────────────────── */
+      answerBtn.addEventListener('click', () => {
+        /* If currently ringing, treat click as cancel */
+        if (landing.classList.contains('connecting')) {
+          cancelCall();
+          return;
         }
-    }
 
-    function avgLevel(pcm) {
-        let sum = 0;
-        for (let i = 0; i < pcm.length; i++) sum += Math.abs(pcm[i]);
-        return sum / pcm.length;
-    }
-
-    function sendAudio() {
-        if (!audioChunks.length || !ws || ws.readyState !== 1) return;
-        const total = audioChunks.reduce((s, c) => s + c.length, 0);
-        const merged = new Float32Array(total);
-        let off = 0;
-        for (const c of audioChunks) { merged.set(c, off); off += c.length; }
-        ws.send(merged.buffer);
-        setState('thinking');
-    }
-
-    // --- PCM Playback (low latency, no WAV decode overhead) ---
-    let activeSources = [];
-
-    function playPCMChunk(arrayBuffer) {
-        if (!playbackCtx || playbackCtx.state === 'closed') {
-            playbackCtx = new AudioContext({ sampleRate: 24000 });
-            nextPlayTime = 0;
+        /* If React not ready yet, queue the click for when it is */
+        if (!reactReady) {
+          landing.classList.add('loading');
+          answerLabel.textContent = 'Warming up\u2026';
+          const waitForReact = setInterval(() => {
+            if (reactReady) {
+              clearInterval(waitForReact);
+              landing.classList.remove('loading');
+              tryConnect();
+            }
+          }, 200);
+          return;
         }
 
-        const int16 = new Int16Array(arrayBuffer);
-        const float32 = new Float32Array(int16.length);
-        for (let i = 0; i < int16.length; i++) {
-            float32[i] = int16[i] / 32768;
-        }
+        tryConnect();
+      });
 
-        const buffer = playbackCtx.createBuffer(1, float32.length, 24000);
-        buffer.getChannelData(0).set(float32);
+      /* ── Hang-up handler — simple: click Disconnect, show landing ────── */
+      hangupBtn.addEventListener('click', () => {
+        const disconnectBtn = findReactBtn(['disconnect']);
+        if (disconnectBtn) disconnectBtn.click();
+        showLanding();
+      });
 
-        const src = playbackCtx.createBufferSource();
-        src.buffer = buffer;
-        src.connect(playbackCtx.destination);
+      /* ── Mute button — visual toggle (functional via future update) ── */
+      let isMuted = false;
+      let speakerMuted = false;
+      const muteBtn = document.getElementById('scarlett-mute');
+      muteBtn.addEventListener('click', () => {
+        isMuted = !isMuted;
+        muteBtn.classList.toggle('active', isMuted);
+        muteBtn.closest('.s-action-item').querySelector('.s-action-label').textContent = isMuted ? 'Unmute' : 'Mute';
+      });
 
-        const now = playbackCtx.currentTime;
-        if (nextPlayTime < now) nextPlayTime = now + 0.01;
-        src.start(nextPlayTime);
-        nextPlayTime += buffer.duration;
+      /* ── Speaker button — visual toggle ────────────────────────────── */
+      const speakerBtn = document.getElementById('scarlett-speaker');
+      speakerBtn.addEventListener('click', () => {
+        speakerMuted = !speakerMuted;
+        speakerBtn.classList.toggle('active', speakerMuted);
+        speakerBtn.closest('.s-action-item').querySelector('.s-action-label').textContent = speakerMuted ? 'Unmute' : 'Speaker';
+      });
 
-        activeSources.push(src);
-        src.onended = () => {
-            activeSources = activeSources.filter(s => s !== src);
-        };
-    }
+      /* ── Watch React transcript output ────────────────────────────────── */
+      function watchTranscript() {
+        const root = document.getElementById('root');
+        if (!root) return;
+        new MutationObserver(() => {
+          if (!connected) return;
+          /* Heuristic: look for italic text or long text nodes that appeared */
+          root.querySelectorAll('p, span, div').forEach(el => {
+            if (el.children.length > 0) return;
+            const text = (el.textContent || '').trim();
+            /* Transcript lines are usually > 15 chars and not numbers/labels */
+            if (
+              text.length > 15 &&
+              !/^\d/.test(text) &&
+              !text.includes('PersonaPlex') &&
+              !text.toLowerCase().includes('connect') &&
+              !text.toLowerCase().includes('disconnect') &&
+              !text.toLowerCase().includes('audio') &&
+              !text.toLowerCase().includes('latency') &&
+              !text.toLowerCase().includes('buffer') &&
+              !text.toLowerCase().includes('server')
+            ) {
+              const cls = (el.className || '').toLowerCase();
+              if (cls.includes('italic') || cls.includes('transcript') || cls.includes('message') || cls.includes('chat')) {
+                transcript.textContent = text;
+                setSpeaking(true);
+                clearTimeout(el._speakTimer);
+                el._speakTimer = setTimeout(() => setSpeaking(false), 3000);
+              }
+            }
+          });
+        }).observe(root, { childList: true, subtree: true, characterData: true });
+      }
 
-    function stopPlayback() {
-        // Stop all currently playing/scheduled audio sources
-        for (const src of activeSources) {
-            try { src.stop(); } catch(e) {}
-        }
-        activeSources = [];
+      /* ── Detect connection state changes from React DOM ─────────────────── */
+      let connectionLostTimer = null;
+      function watchConnectionState() {
+        const root = document.getElementById('root');
+        if (!root) return;
+        new MutationObserver(() => {
+          if (!connected) return; /* only watch during active call */
+          const disconnectBtn = findReactBtn(['disconnect']);
+          if (!disconnectBtn) {
+            /* Debounce: React re-renders can briefly remove the button.
+               Only treat as "call ended" if button stays gone for 800ms. */
+            if (!connectionLostTimer) {
+              connectionLostTimer = setTimeout(() => {
+                connectionLostTimer = null;
+                if (!connected) return;
+                const btn = findReactBtn(['disconnect']);
+                if (!btn) {
+                  /* Confirmed: disconnect button is truly gone */
+                  showLanding();
+                }
+              }, 800);
+            }
+          } else {
+            /* Button is back — cancel any pending "lost" timer */
+            if (connectionLostTimer) {
+              clearTimeout(connectionLostTimer);
+              connectionLostTimer = null;
+            }
+          }
+        }).observe(root, { childList: true, subtree: true });
+      }
 
-        // Close and recreate context to ensure clean slate
-        if (playbackCtx && playbackCtx.state !== 'closed') {
-            playbackCtx.close().catch(() => {});
-        }
-        playbackCtx = null;
-        nextPlayTime = 0;
-    }
+      /* ── Bootstrap: wait for React to render ──────────────────────────── */
+      let pollTries = 0;
+      const poll = setInterval(() => {
+        pollTries++;
+        if (pollTries > 300) { clearInterval(poll); return; }
 
-    connect();
+        const root = document.getElementById('root');
+        if (!root || !root.innerHTML.trim()) return;
+
+        /* Wait until we see at least one button (the Connect button) */
+        const anyBtn = root.querySelector('button');
+        if (!anyBtn) return;
+
+        clearInterval(poll);
+        reactReady = true;
+
+        /* Configure persona and voice in the background */
+        setPersona();
+        setVoice();
+
+        /* Suppress all React UI */
+        nukeReactUI();
+
+        /* Start watching for DOM changes */
+        watchTranscript();
+        watchConnectionState();
+
+        /* Retry persona/voice if they weren't ready first time */
+        setTimeout(() => { setPersona(); setVoice(); nukeReactUI(); }, 800);
+        setTimeout(() => { setPersona(); setVoice(); nukeReactUI(); }, 2000);
+
+      }, 100);
+
+      /* ── No monkey-patching — keep PersonaPlex audio pristine ────────── */
+      window.__bv_micStreams = [];
+      window.__bv_audioContexts = [];
+
+    })();
     </script>
-</body>
+  </body>
 </html>

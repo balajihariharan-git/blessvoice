@@ -1,0 +1,1001 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Samantha</title>
+  <style>
+    /* ═══ Reset ═══════════════════════════════════════════════════════════ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      background: #0a0a0f;
+      color: #ddd;
+      min-height: 100dvh;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* ═══ Ambient background ══════════════════════════════════════════════ */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0;
+      background: radial-gradient(ellipse at 50% 30%, rgba(255,120,80,0.08) 0%, transparent 60%),
+                  radial-gradient(ellipse at 30% 70%, rgba(100,140,255,0.05) 0%, transparent 50%),
+                  #0a0a0f;
+      pointer-events: none;
+    }
+
+    /* ═══ Landing — "Call Samantha" ════════════════════════════════════════ */
+    #landing {
+      position: fixed; inset: 0; z-index: 10;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.2rem;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    #landing.hidden {
+      opacity: 0; pointer-events: none; transform: scale(0.96);
+    }
+
+    .l-portrait-ring {
+      position: relative;
+      width: 160px; height: 160px;
+      flex-shrink: 0;
+    }
+    .l-portrait-ring::before {
+      content: '';
+      position: absolute; inset: -6px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, rgba(255,160,120,0.9), rgba(200,100,80,0.6), rgba(255,160,120,0.9));
+      animation: ring-spin 4s linear infinite;
+    }
+    @keyframes ring-spin { to { transform: rotate(360deg); } }
+    .l-portrait-ring::after {
+      content: '';
+      position: absolute; inset: -10px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,120,80,0.25) 0%, transparent 70%);
+      animation: ring-pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes ring-pulse {
+      0%, 100% { transform: scale(1); opacity: 0.6; }
+      50% { transform: scale(1.15); opacity: 1; }
+    }
+    .l-portrait-img {
+      width: 160px; height: 160px;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center 15%;
+      position: relative; z-index: 1;
+      border: 3px solid rgba(255,160,120,0.5);
+      box-shadow: 0 0 0 6px rgba(10,10,15,0.8), 0 0 60px rgba(255,120,80,0.35), 0 20px 60px rgba(0,0,0,0.7);
+    }
+
+    .l-name {
+      font-family: Georgia, 'Times New Roman', serif;
+      font-size: clamp(2rem, 7vw, 2.8rem);
+      font-weight: 300;
+      letter-spacing: 0.1em;
+      color: rgba(255,200,180,0.85);
+    }
+    .l-tagline {
+      font-family: Georgia, serif;
+      font-style: italic;
+      font-size: clamp(0.85rem, 2.5vw, 1rem);
+      color: rgba(255,255,255,0.3);
+      text-align: center;
+      max-width: 280px;
+    }
+
+    .l-call-btn {
+      width: 72px; height: 72px;
+      border-radius: 50%; border: none; cursor: pointer; outline: none;
+      background: linear-gradient(145deg, rgba(255,140,100,0.9), rgba(220,90,60,0.9));
+      box-shadow: 0 6px 30px rgba(255,120,80,0.4);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s ease;
+      animation: call-pulse 2.5s ease-in-out infinite;
+      margin-top: 0.5rem;
+    }
+    .l-call-btn:hover { transform: scale(1.08); }
+    .l-call-btn:active { transform: scale(0.95); }
+    @keyframes call-pulse {
+      0%   { box-shadow: 0 6px 30px rgba(255,120,80,0.4), 0 0 0 0    rgba(255,120,80,0.3); }
+      50%  { box-shadow: 0 6px 30px rgba(255,120,80,0.2), 0 0 0 20px rgba(255,120,80,0);   }
+      100% { box-shadow: 0 6px 30px rgba(255,120,80,0.4), 0 0 0 0    rgba(255,120,80,0.3); }
+    }
+    .l-call-btn svg { width: 30px; height: 30px; fill: #fff; }
+
+    .l-label {
+      font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: rgba(255,255,255,0.25);
+    }
+
+    #landing.connecting .l-call-btn {
+      background: linear-gradient(145deg, #ef4444, #b91c1c);
+      animation: none;
+    }
+    #landing.connecting .l-label { color: rgba(255,150,150,0.4); }
+    #landing.connecting .l-portrait-ring::before {
+      animation: ring-spin 1.5s linear infinite;
+    }
+    #landing.connecting .l-portrait-ring::after {
+      animation: ring-pulse 0.9s ease-in-out infinite;
+    }
+
+    /* ═══ Connected — Active call ══════════════════════════════════════════ */
+    #call-view {
+      position: fixed; inset: 0; z-index: 10;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 0;
+    }
+    #call-view.visible { display: flex; }
+    #call-view.layer-active { display: none !important; }
+
+    /* -- Top bar -- */
+    .c-top {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 0.2rem;
+      padding-top: clamp(2rem, 6vh, 4rem);
+      flex-shrink: 0;
+    }
+    .c-timer {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.85rem; color: rgba(255,255,255,0.3); letter-spacing: 0.1em;
+    }
+    .c-name {
+      font-family: Georgia, serif;
+      font-size: clamp(1.6rem, 5vw, 2.2rem);
+      font-weight: 300; letter-spacing: 0.08em;
+      color: rgba(255,200,180,0.85);
+    }
+    .c-status {
+      font-size: 0.65rem; color: rgba(160,255,160,0.5);
+      letter-spacing: 0.1em; text-transform: uppercase;
+    }
+
+    /* -- Center: orb + waveform + transcript -- */
+    .c-center {
+      flex: 1; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 0.8rem;
+      min-height: 0;
+    }
+
+    .c-portrait-ring {
+      position: relative;
+      width: clamp(160px, 40vw, 220px);
+      height: clamp(160px, 40vw, 220px);
+      flex-shrink: 0;
+    }
+    .c-portrait-ring::after {
+      content: '';
+      position: absolute; inset: -10px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,120,80,0.25) 0%, transparent 70%);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .c-portrait-ring.speaking::after {
+      opacity: 1;
+      animation: speaking-glow 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes speaking-glow {
+      from { transform: scale(1); opacity: 0.4; }
+      to   { transform: scale(1.2); opacity: 1; }
+    }
+    .c-portrait-img {
+      width: 100%; height: 100%;
+      border-radius: 50%;
+      object-fit: cover;
+      object-position: center 15%;
+      position: relative; z-index: 1;
+      border: 3px solid rgba(255,160,120,0.35);
+      box-shadow: 0 0 0 6px rgba(10,10,15,0.7), 0 0 50px rgba(255,120,80,0.15);
+      transition: box-shadow 0.3s ease;
+    }
+    .c-portrait-ring.speaking .c-portrait-img {
+      box-shadow: 0 0 0 6px rgba(10,10,15,0.7), 0 0 70px rgba(255,120,80,0.5), 0 0 120px rgba(255,100,80,0.2);
+    }
+
+    .c-waveform {
+      display: flex; align-items: flex-end; gap: 4px; height: 20px;
+      opacity: 0; transition: opacity 0.3s ease;
+    }
+    .c-waveform.active { opacity: 1; }
+    .c-waveform span {
+      display: block; width: 3px; min-height: 3px; border-radius: 1.5px;
+      background: linear-gradient(to top, rgba(255,140,100,0.7), rgba(255,200,180,0.3));
+    }
+    .c-waveform.active span:nth-child(1) { animation: eq 0.8s ease-in-out infinite 0s; }
+    .c-waveform.active span:nth-child(2) { animation: eq 0.8s ease-in-out infinite 0.1s; }
+    .c-waveform.active span:nth-child(3) { animation: eq 0.8s ease-in-out infinite 0.2s; }
+    .c-waveform.active span:nth-child(4) { animation: eq 0.8s ease-in-out infinite 0.15s; }
+    .c-waveform.active span:nth-child(5) { animation: eq 0.8s ease-in-out infinite 0.05s; }
+    @keyframes eq {
+      0%, 100% { height: 3px; }
+      50%      { height: 18px; }
+    }
+
+    .c-transcript {
+      max-width: 300px; max-height: 50px; overflow-y: auto;
+      font-family: Georgia, serif; font-style: italic;
+      font-size: 0.85rem; line-height: 1.4;
+      color: rgba(255,200,180,0.4); text-align: center;
+      padding: 0 1rem;
+    }
+    .c-transcript:empty { display: none; }
+
+    /* -- Bottom: controls + hangup -- */
+    .c-bottom {
+      flex-shrink: 0; display: flex; flex-direction: column;
+      align-items: center; gap: 1rem;
+      padding-bottom: clamp(1.5rem, 4vh, 3rem);
+    }
+    .c-actions {
+      display: flex; align-items: center; justify-content: center;
+      gap: clamp(2rem, 8vw, 3.5rem);
+    }
+
+    .c-action-item { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; }
+    .c-action-btn {
+      width: 52px; height: 52px; border-radius: 50%; border: none;
+      cursor: pointer; outline: none;
+      background: rgba(255,255,255,0.06); backdrop-filter: blur(6px);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s ease, transform 0.15s ease;
+    }
+    .c-action-btn:hover { background: rgba(255,255,255,0.1); transform: scale(1.06); }
+    .c-action-btn:active { transform: scale(0.94); }
+    .c-action-btn svg { width: 20px; height: 20px; fill: rgba(255,255,255,0.6); }
+    .c-action-btn.active { background: rgba(255,140,100,0.2); }
+    .c-action-btn.active svg { fill: rgba(255,180,150,0.9); }
+    .c-action-lbl { font-size: 0.55rem; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.2); }
+
+    .c-hangup {
+      width: 64px; height: 64px; border-radius: 50%; border: none;
+      cursor: pointer; outline: none;
+      background: linear-gradient(145deg, #e74c3c, #a93226);
+      box-shadow: 0 4px 24px rgba(231,76,60,0.4);
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s ease;
+    }
+    .c-hangup:hover { transform: scale(1.07); }
+    .c-hangup:active { transform: scale(0.94); }
+    .c-hangup svg { width: 26px; height: 26px; fill: #fff; transform: rotate(135deg); }
+
+    /* ═══ Magic Layer ═════════════════════════════════════════════════════ */
+    #magic-layer {
+      position: fixed; inset: 0; z-index: 50;
+      display: none;
+      flex-direction: column;
+      background: rgba(10,10,15,0.95);
+      backdrop-filter: blur(20px);
+      transition: opacity 0.3s ease;
+    }
+    #magic-layer.visible { display: flex; }
+
+    .ml-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0.8rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      flex-shrink: 0;
+    }
+    .ml-title {
+      font-family: Georgia, serif; font-size: 0.9rem;
+      color: rgba(255,200,180,0.7); font-weight: 300;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 70%;
+    }
+    .ml-close {
+      width: 36px; height: 36px; border-radius: 50%; border: none;
+      cursor: pointer; outline: none;
+      background: rgba(255,255,255,0.08);
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.2s ease;
+    }
+    .ml-close:hover { background: rgba(255,255,255,0.15); }
+    .ml-close svg { width: 16px; height: 16px; fill: rgba(255,255,255,0.5); }
+
+    .ml-content {
+      flex: 1; overflow-y: auto; position: relative;
+    }
+
+    /* YouTube embed */
+    .ml-content iframe {
+      width: 100%; height: 100%; border: none;
+    }
+
+    /* Search results */
+    .ml-search-results {
+      padding: 1rem;
+      display: flex; flex-direction: column; gap: 0.8rem;
+    }
+    .ml-search-card {
+      padding: 1rem;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .ml-search-card:hover {
+      background: rgba(255,140,100,0.06);
+      border-color: rgba(255,140,100,0.2);
+    }
+    .ml-search-card h3 {
+      font-size: 0.95rem; font-weight: 500;
+      color: rgba(255,200,180,0.85);
+      margin-bottom: 0.3rem;
+    }
+    .ml-search-card p {
+      font-size: 0.8rem; line-height: 1.4;
+      color: rgba(255,255,255,0.4);
+    }
+    .ml-search-card .ml-url {
+      font-size: 0.65rem; color: rgba(255,140,100,0.5);
+      margin-top: 0.3rem;
+    }
+
+    /* Timer */
+    .ml-timer {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; gap: 1.5rem;
+    }
+    .ml-timer-ring {
+      width: 200px; height: 200px; position: relative;
+    }
+    .ml-timer-ring svg {
+      width: 100%; height: 100%; transform: rotate(-90deg);
+    }
+    .ml-timer-ring circle {
+      fill: none; stroke-width: 4;
+    }
+    .ml-timer-bg { stroke: rgba(255,255,255,0.06); }
+    .ml-timer-fg {
+      stroke: rgba(255,140,100,0.7);
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear;
+    }
+    .ml-timer-text {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .ml-timer-digits {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 2.5rem; color: rgba(255,200,180,0.8);
+    }
+    .ml-timer-label {
+      font-family: Georgia, serif; font-size: 0.85rem;
+      color: rgba(255,255,255,0.3); font-style: italic;
+    }
+
+    /* ═══ PIP Bubble (Samantha mini when layer is active) ═════════════════ */
+    #pip-bubble {
+      position: fixed; top: 1rem; right: 1rem; z-index: 60;
+      display: none;
+      flex-direction: column; align-items: center; gap: 0.3rem;
+      cursor: pointer;
+    }
+    #pip-bubble.visible { display: flex; }
+    .pip-img {
+      width: 50px; height: 50px; border-radius: 50%;
+      object-fit: cover; object-position: center 15%;
+      border: 2px solid rgba(255,160,120,0.4);
+      box-shadow: 0 0 20px rgba(255,120,80,0.2);
+      transition: box-shadow 0.3s ease;
+    }
+    .pip-img.speaking {
+      box-shadow: 0 0 40px rgba(255,120,80,0.5);
+      animation: speaking-glow 0.8s ease-in-out infinite alternate;
+    }
+    .pip-timer {
+      font-family: 'SF Mono', monospace;
+      font-size: 0.55rem; color: rgba(255,255,255,0.25);
+    }
+
+    /* ═══ Footer ══════════════════════════════════════════════════════════ */
+    #footer {
+      position: fixed; bottom: 6px; width: 100%; z-index: 200;
+      text-align: center; font-size: 0.45rem;
+      color: rgba(255,255,255,0.06); pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ═══ Landing ═════════════════════════════════════════════════════ -->
+  <section id="landing">
+    <div class="l-portrait-ring">
+      <img class="l-portrait-img" src="/samantha.jpg" alt="Samantha" />
+    </div>
+    <div class="l-name">Samantha</div>
+    <p class="l-tagline" id="tagline">"I've been looking forward to this."</p>
+    <button class="l-call-btn" id="call-btn" aria-label="Call Samantha">
+      <svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.47 11.47 0 0 0 3.59.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.47 11.47 0 0 0 .57 3.59 1 1 0 0 1-.25 1.02z"/></svg>
+    </button>
+    <span class="l-label" id="call-label">Tap to call</span>
+  </section>
+
+  <!-- ═══ Active Call ═════════════════════════════════════════════════ -->
+  <section id="call-view">
+    <div class="c-top">
+      <div class="c-timer" id="timer">00:00</div>
+      <div class="c-name">Samantha</div>
+      <div class="c-status" id="call-status">Connected</div>
+    </div>
+    <div class="c-center">
+      <div class="c-portrait-ring" id="portrait-ring">
+        <img class="c-portrait-img" src="/samantha.jpg" alt="Samantha" />
+      </div>
+      <div class="c-waveform" id="waveform">
+        <span></span><span></span><span></span><span></span><span></span>
+      </div>
+      <div class="c-transcript" id="transcript"></div>
+    </div>
+    <div class="c-bottom">
+      <div class="c-actions">
+        <div class="c-action-item">
+          <button class="c-action-btn" id="mute-btn" aria-label="Mute">
+            <svg viewBox="0 0 24 24"><path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm-1-9c0-.55.45-1 1-1s1 .45 1 1v6c0 .55-.45 1-1 1s-1-.45-1-1V5z"/><path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/></svg>
+          </button>
+          <span class="c-action-lbl" id="mute-lbl">Mute</span>
+        </div>
+        <div class="c-action-item">
+          <button class="c-action-btn" id="speaker-btn" aria-label="Speaker">
+            <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          </button>
+          <span class="c-action-lbl" id="speaker-lbl">Speaker</span>
+        </div>
+      </div>
+      <button class="c-hangup" id="hangup-btn" aria-label="End call">
+        <svg viewBox="0 0 24 24"><path d="M6.62 10.79a15.05 15.05 0 0 0 6.59 6.59l2.2-2.2a1 1 0 0 1 1.01-.24 11.47 11.47 0 0 0 3.59.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1 11.47 11.47 0 0 0 .57 3.59 1 1 0 0 1-.25 1.02z"/></svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══ Magic Layer ═════════════════════════════════════════════════ -->
+  <div id="magic-layer">
+    <div class="ml-header">
+      <span class="ml-title" id="ml-title"></span>
+      <button class="ml-close" id="ml-close" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      </button>
+    </div>
+    <div class="ml-content" id="ml-content"></div>
+  </div>
+
+  <!-- ═══ PIP Bubble ══════════════════════════════════════════════════ -->
+  <div id="pip-bubble">
+    <img class="pip-img" id="pip-img" src="/samantha.jpg" alt="Samantha" />
+    <div class="pip-timer" id="pip-timer">00:00</div>
+  </div>
+
+  <div id="footer">voice.balajihariharan.com</div>
+
+  <!-- ═══ JavaScript ══════════════════════════════════════════════════ -->
+  <script>
+  (function() {
+    'use strict';
+
+    /* ── Audio config ─────────────────────────────────────────────── */
+    const SAMPLE_RATE_IN  = 16000;  // Send 16kHz mono float32
+    const SAMPLE_RATE_OUT = 24000;  // Receive 24kHz mono int16
+    const SILENCE_THRESHOLD = 0.012;
+    const SILENCE_MS = 800;
+    const MIN_SPEECH_MS = 300;
+    const BUFFER_SIZE = 2048;
+
+    /* ── State ────────────────────────────────────────────────────── */
+    let ws = null;
+    let connected = false;
+    let speaking = false;
+    let muted = false;
+    let speakerMuted = false;
+    let timerSec = 0;
+    let timerInterval = null;
+    let audioCtx = null;
+    let micStream = null;
+    let scriptProcessor = null;
+    let audioChunks = [];
+    let silenceStart = null;
+    let speechStart = null;
+    let nextPlayTime = 0;
+    let activeTimerInterval = null;
+
+    /* ── DOM refs ─────────────────────────────────────────────────── */
+    const landing   = document.getElementById('landing');
+    const callView  = document.getElementById('call-view');
+    const callBtn   = document.getElementById('call-btn');
+    const hangupBtn = document.getElementById('hangup-btn');
+    const timerEl   = document.getElementById('timer');
+    const portraitRing = document.getElementById('portrait-ring');
+    const waveform  = document.getElementById('waveform');
+    const transcript = document.getElementById('transcript');
+    const statusEl  = document.getElementById('call-status');
+    const tagline   = document.getElementById('tagline');
+    const callLabel = document.getElementById('call-label');
+    const muteBtn   = document.getElementById('mute-btn');
+    const muteLbl   = document.getElementById('mute-lbl');
+    const speakerBtn = document.getElementById('speaker-btn');
+    const speakerLbl = document.getElementById('speaker-lbl');
+    const magicLayer = document.getElementById('magic-layer');
+    const mlTitle   = document.getElementById('ml-title');
+    const mlContent = document.getElementById('ml-content');
+    const mlClose   = document.getElementById('ml-close');
+    const pipBubble = document.getElementById('pip-bubble');
+    const pipImg    = document.getElementById('pip-img');
+    const pipTimer  = document.getElementById('pip-timer');
+
+    /* ── Timer ────────────────────────────────────────────────────── */
+    function startTimer() {
+      timerSec = 0;
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timerSec++;
+        const t = fmtTime(timerSec);
+        timerEl.textContent = t;
+        pipTimer.textContent = t;
+      }, 1000);
+    }
+    function stopTimer() { clearInterval(timerInterval); }
+    function fmtTime(s) {
+      return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+    }
+
+    /* ── UI states ────────────────────────────────────────────────── */
+    function showCall() {
+      connected = true;
+      landing.classList.add('hidden');
+      landing.classList.remove('connecting');
+      callView.classList.add('visible');
+      startTimer();
+    }
+
+    function showLanding() {
+      connected = false;
+      speaking = false;
+      landing.classList.remove('hidden', 'connecting');
+      callView.classList.remove('visible');
+      stopTimer();
+      timerEl.textContent = '00:00';
+      setSpeaking(false);
+      transcript.textContent = '';
+      dismissLayer();
+      if (ws) { ws.close(); ws = null; }
+      stopMic();
+      tagline.textContent = '"I\'ve been looking forward to this."';
+      callLabel.textContent = 'Tap to call';
+    }
+
+    function setSpeaking(active) {
+      speaking = active;
+      portraitRing.classList.toggle('speaking', active);
+      waveform.classList.toggle('active', active);
+      pipImg.classList.toggle('speaking', active);
+    }
+
+    /* ── Magic Layer Manager ──────────────────────────────────────── */
+    function showLayer(title, contentHtml) {
+      mlTitle.textContent = title;
+      mlContent.innerHTML = contentHtml;
+      magicLayer.classList.add('visible');
+      pipBubble.classList.add('visible');
+      // Hide full call view via class, show PIP
+      callView.classList.add('layer-active');
+    }
+
+    function dismissLayer() {
+      magicLayer.classList.remove('visible');
+      pipBubble.classList.remove('visible');
+      mlContent.innerHTML = '';
+      callView.classList.remove('layer-active');
+      // Stop any active timer
+      if (activeTimerInterval) {
+        clearInterval(activeTimerInterval);
+        activeTimerInterval = null;
+      }
+    }
+
+    function handleToolCall(msg) {
+      const tool = msg.tool;
+      const params = msg.params || {};
+
+      switch (tool) {
+        case 'play_youtube':
+          renderYouTube(params.query || '');
+          break;
+        case 'web_search':
+          renderSearch(params.query || '', params.results || []);
+          break;
+        case 'set_timer':
+          renderTimer(params.seconds || 60, params.label || 'Timer');
+          break;
+        case 'dismiss_layer':
+          dismissLayer();
+          break;
+        default:
+          console.warn('Unknown tool:', tool);
+      }
+    }
+
+    function renderYouTube(query) {
+      // YouTube blocks iframe search embeds. Two strategies:
+      // 1. Use piped.video (open-source YouTube frontend that allows embedding)
+      // 2. Fallback: open YouTube search in the layer via a styled card + link
+      const encoded = encodeURIComponent(query);
+
+      // Try piped.video embed (privacy-friendly YouTube frontend, allows iframes)
+      const pipedUrl = 'https://piped.video/results?search_query=' + encoded;
+
+      const html =
+        '<div style="width:100%;height:100%;display:flex;flex-direction:column">' +
+          '<iframe src="' + pipedUrl + '" ' +
+            'style="flex:1;width:100%;border:none" ' +
+            'allow="autoplay;encrypted-media" ' +
+            'sandbox="allow-scripts allow-same-origin allow-popups" ' +
+            'loading="lazy"></iframe>' +
+          '<div style="padding:0.6rem 1rem;text-align:center;flex-shrink:0;' +
+            'border-top:1px solid rgba(255,255,255,0.06)">' +
+            '<a href="https://www.youtube.com/results?search_query=' + encoded + '" ' +
+              'target="_blank" rel="noopener" ' +
+              'style="color:rgba(255,140,100,0.6);font-size:0.75rem;text-decoration:none">' +
+              'Open in YouTube &#8599;</a>' +
+          '</div>' +
+        '</div>';
+
+      showLayer('YouTube: ' + query, html);
+
+      // If piped iframe fails to load, show fallback after 5s
+      setTimeout(() => {
+        const iframe = mlContent.querySelector('iframe');
+        if (!iframe) return;
+        iframe.onerror = () => renderYouTubeFallback(query);
+      }, 100);
+    }
+
+    function renderYouTubeFallback(query) {
+      const encoded = encodeURIComponent(query);
+      const html =
+        '<div class="ml-search-results">' +
+          '<div class="ml-search-card" onclick="window.open(\'https://www.youtube.com/results?search_query=' + encoded + '\')">' +
+            '<h3>&#9654; ' + escHtml(query) + '</h3>' +
+            '<p>Tap to open YouTube search results</p>' +
+            '<div class="ml-url">youtube.com</div>' +
+          '</div>' +
+        '</div>';
+      showLayer('YouTube: ' + query, html);
+    }
+
+    function renderSearch(query, results) {
+      let html = '<div class="ml-search-results">';
+
+      if (results.length > 0) {
+        results.forEach(r => {
+          const safeUrl = escHtml(r.url || '#');
+          html += '<div class="ml-search-card" data-url="' + safeUrl + '">' +
+            '<h3>' + escHtml(r.title || '') + '</h3>' +
+            '<p>' + escHtml(r.snippet || '') + '</p>' +
+            '<div class="ml-url">' + safeUrl + '</div>' +
+            '</div>';
+        });
+      } else {
+        // No server results — show a styled search card that opens DuckDuckGo
+        const encoded = encodeURIComponent(query);
+        html +=
+          '<div class="ml-search-card" data-url="https://duckduckgo.com/?q=' + encoded + '">' +
+            '<h3>Search: ' + escHtml(query) + '</h3>' +
+            '<p>Tap to view search results</p>' +
+            '<div class="ml-url">duckduckgo.com</div>' +
+          '</div>' +
+          '<div class="ml-search-card" data-url="https://www.google.com/search?q=' + encoded + '">' +
+            '<h3>Google: ' + escHtml(query) + '</h3>' +
+            '<p>Tap to view Google results</p>' +
+            '<div class="ml-url">google.com</div>' +
+          '</div>';
+      }
+
+      html += '</div>';
+      showLayer('Search: ' + query, html);
+
+      // Attach click handlers safely (no inline onclick with string interpolation)
+      mlContent.querySelectorAll('.ml-search-card[data-url]').forEach(card => {
+        card.addEventListener('click', () => window.open(card.dataset.url, '_blank'));
+      });
+    }
+
+    function renderTimer(seconds, label) {
+      const circumference = 2 * Math.PI * 90; // r=90 for 200px SVG
+      let remaining = seconds;
+
+      const html =
+        '<div class="ml-timer">' +
+          '<div class="ml-timer-ring">' +
+            '<svg viewBox="0 0 200 200">' +
+              '<circle class="ml-timer-bg" cx="100" cy="100" r="90"/>' +
+              '<circle class="ml-timer-fg" id="timer-ring-fg" cx="100" cy="100" r="90" ' +
+                'stroke-dasharray="' + circumference + '" stroke-dashoffset="0"/>' +
+            '</svg>' +
+            '<div class="ml-timer-text">' +
+              '<div class="ml-timer-digits" id="timer-digits">' + fmtTime(seconds) + '</div>' +
+              '<div class="ml-timer-label">' + escHtml(label) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+      showLayer('Timer: ' + label, html);
+
+      const fgEl = document.getElementById('timer-ring-fg');
+      const digitsEl = document.getElementById('timer-digits');
+
+      activeTimerInterval = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(activeTimerInterval);
+          activeTimerInterval = null;
+          digitsEl.textContent = '00:00';
+          fgEl.style.strokeDashoffset = circumference;
+          // Alert
+          timerAlert();
+          return;
+        }
+        digitsEl.textContent = fmtTime(remaining);
+        const progress = 1 - (remaining / seconds);
+        fgEl.style.strokeDashoffset = circumference * progress;
+      }, 1000);
+    }
+
+    function timerAlert() {
+      // Simple audio alert using Web Audio API
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        [523, 659, 784].forEach((freq, i) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.15, ctx.currentTime + i * 0.3);
+          gain.gain.linearRampToValueAtTime(0, ctx.currentTime + i * 0.3 + 0.3);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start(ctx.currentTime + i * 0.3);
+          osc.stop(ctx.currentTime + i * 0.3 + 0.3);
+        });
+      } catch(e) {}
+    }
+
+    function escHtml(s) {
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    /* ── WebSocket ────────────────────────────────────────────────── */
+    function connect() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(proto + '//' + location.host + '/ws/agent');
+
+      ws.binaryType = 'arraybuffer';
+
+      ws.onopen = () => {
+        showCall();
+        startMic();
+      };
+
+      ws.onmessage = (evt) => {
+        if (typeof evt.data === 'string') {
+          const msg = JSON.parse(evt.data);
+          if (msg.type === 'speaking') {
+            setSpeaking(true);
+            nextPlayTime = 0; // Reset playback scheduling
+          } else if (msg.type === 'done') {
+            // Delay turning off speaking until audio finishes
+            setTimeout(() => setSpeaking(false), 500);
+          } else if (msg.type === 'tool_call') {
+            handleToolCall(msg);
+          } else if (msg.type === 'error') {
+            statusEl.textContent = msg.message || 'Error';
+          }
+        } else {
+          // Binary audio data — play it
+          playAudio(evt.data);
+        }
+      };
+
+      ws.onerror = () => {
+        statusEl.textContent = 'Connection error';
+      };
+
+      ws.onclose = () => {
+        if (connected) showLanding();
+      };
+    }
+
+    /* ── Microphone capture ───────────────────────────────────────── */
+    function startMic() {
+      navigator.mediaDevices.getUserMedia({
+        audio: {
+          sampleRate: SAMPLE_RATE_IN,
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        }
+      }).then(stream => {
+        micStream = stream;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE_IN });
+        const source = audioCtx.createMediaStreamSource(stream);
+        scriptProcessor = audioCtx.createScriptProcessor(BUFFER_SIZE, 1, 1);
+
+        scriptProcessor.onaudioprocess = (e) => {
+          if (muted || !connected) return;
+          const data = e.inputBuffer.getChannelData(0);
+          processAudioFrame(data);
+        };
+
+        source.connect(scriptProcessor);
+        scriptProcessor.connect(audioCtx.destination);
+      }).catch(err => {
+        console.error('Mic error:', err);
+        statusEl.textContent = 'Mic denied';
+      });
+    }
+
+    function stopMic() {
+      if (scriptProcessor) { scriptProcessor.disconnect(); scriptProcessor = null; }
+      if (audioCtx) { audioCtx.close().catch(() => {}); audioCtx = null; }
+      if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+      audioChunks = [];
+      silenceStart = null;
+      speechStart = null;
+    }
+
+    /* ── Interruption ─────────────────────────────────────────────── */
+    function interruptSamantha() {
+      // Stop audio playback immediately
+      if (playbackCtx && playbackCtx.state !== 'closed') {
+        playbackCtx.close().catch(() => {});
+        playbackCtx = null;
+      }
+      nextPlayTime = 0;
+      setSpeaking(false);
+      // Tell server to abort current pipeline
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'interrupt' }));
+      }
+    }
+
+    /* ── VAD (Voice Activity Detection) ───────────────────────────── */
+    function processAudioFrame(data) {
+      const level = Math.sqrt(data.reduce((sum, v) => sum + v * v, 0) / data.length);
+      const now = Date.now();
+
+      if (level > SILENCE_THRESHOLD) {
+        // If Samantha is speaking and user starts talking, interrupt her
+        if (speaking && !speechStart) {
+          interruptSamantha();
+        }
+
+        // Speech detected
+        silenceStart = null;
+        if (!speechStart) speechStart = now;
+        audioChunks.push(new Float32Array(data));
+      } else {
+        // Silence
+        if (speechStart && !silenceStart) {
+          silenceStart = now;
+        }
+
+        if (speechStart) {
+          audioChunks.push(new Float32Array(data));
+        }
+
+        // Check if silence duration exceeded
+        if (silenceStart && speechStart && (now - silenceStart >= SILENCE_MS)) {
+          const speechDuration = silenceStart - speechStart;
+          if (speechDuration >= MIN_SPEECH_MS && audioChunks.length > 0) {
+            sendAudio();
+          }
+          audioChunks = [];
+          speechStart = null;
+          silenceStart = null;
+        }
+      }
+    }
+
+    function sendAudio() {
+      if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+      // Concatenate all chunks into one Float32Array
+      const totalLength = audioChunks.reduce((sum, c) => sum + c.length, 0);
+      const combined = new Float32Array(totalLength);
+      let offset = 0;
+      for (const chunk of audioChunks) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      // Send as binary
+      ws.send(combined.buffer);
+    }
+
+    /* ── Audio playback (PCM int16 24kHz) ─────────────────────────── */
+    let playbackCtx = null;
+
+    function getPlaybackCtx() {
+      if (!playbackCtx || playbackCtx.state === 'closed') {
+        playbackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: SAMPLE_RATE_OUT });
+      }
+      return playbackCtx;
+    }
+
+    function playAudio(arrayBuffer) {
+      if (speakerMuted) return;
+
+      const ctx = getPlaybackCtx();
+      const int16 = new Int16Array(arrayBuffer);
+      const float32 = new Float32Array(int16.length);
+      for (let i = 0; i < int16.length; i++) {
+        float32[i] = int16[i] / 32768;
+      }
+
+      const buffer = ctx.createBuffer(1, float32.length, SAMPLE_RATE_OUT);
+      buffer.getChannelData(0).set(float32);
+
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      if (nextPlayTime < now) nextPlayTime = now;
+      source.start(nextPlayTime);
+      nextPlayTime += buffer.duration;
+    }
+
+    /* ── Button handlers ──────────────────────────────────────────── */
+    callBtn.addEventListener('click', () => {
+      if (landing.classList.contains('connecting')) {
+        // Cancel
+        landing.classList.remove('connecting');
+        tagline.textContent = '"I\'ve been looking forward to this."';
+        callLabel.textContent = 'Tap to call';
+        if (ws) { ws.close(); ws = null; }
+        return;
+      }
+
+      landing.classList.add('connecting');
+      tagline.textContent = '"Just a moment..."';
+      callLabel.textContent = 'Connecting...';
+      connect();
+    });
+
+    hangupBtn.addEventListener('click', showLanding);
+
+    muteBtn.addEventListener('click', () => {
+      muted = !muted;
+      muteBtn.classList.toggle('active', muted);
+      muteLbl.textContent = muted ? 'Unmute' : 'Mute';
+    });
+
+    speakerBtn.addEventListener('click', () => {
+      speakerMuted = !speakerMuted;
+      speakerBtn.classList.toggle('active', speakerMuted);
+      speakerLbl.textContent = speakerMuted ? 'Unmute' : 'Speaker';
+    });
+
+    mlClose.addEventListener('click', dismissLayer);
+
+    pipBubble.addEventListener('click', dismissLayer);
+
+  })();
+  </script>
+</body>
+</html>

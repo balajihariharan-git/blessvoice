@@ -104,28 +104,36 @@ ssh -i D:/BlessVoice/infra/blessvoice-key.pem ubuntu@52.66.45.156
 
 If you're worried you left it running:
 ```bash
-aws ec2 describe-instances --instance-ids i-083b43fdf32a23483 --region ap-south-1 \
+aws ec2 describe-instances --instance-ids i-083b43fdf32a23483 --region ap-south-1 --profile claude-code-ops \
   --query 'Reservations[0].Instances[0].State.Name' --output text
 ```
 
 If it says "running" and you're not using it:
 ```bash
-aws ec2 stop-instances --instance-ids i-083b43fdf32a23483 --region ap-south-1
+aws ec2 stop-instances --instance-ids i-083b43fdf32a23483 --region ap-south-1 --profile claude-code-ops
 ```
 
 ---
 
-## First-Time Setup (Run Once)
+## First-Time Setup (Run Once — NOT YET DONE)
 
-After first boot, SSH in and run the setup script:
+Python 3.12 and NVIDIA drivers are confirmed working. Still need to complete:
+- pip packages: torch (CUDA 12.1), fastapi, uvicorn, websockets, vllm
+- /opt/blessvoice directory
+- systemd service for blessvoice
+- auto-stop cron job
+- AWS CLI
+
+Run the setup script (takes ~20 min for torch + vllm download):
 ```bash
-# From D:/BlessVoice/
-# 1. Copy setup script to instance
-scp -i infra/blessvoice-key.pem infra/setup-gpu.sh ubuntu@65.2.130.138:/tmp/
+# From D:/BlessVoice/ — start instance first
+bash infra/gpu-start.sh
 
-# 2. SSH in and run it
-ssh -i infra/blessvoice-key.pem ubuntu@65.2.130.138
+# Copy and run setup
+scp -i infra/blessvoice-key.pem infra/setup-gpu.sh ubuntu@52.66.45.156:/tmp/
+ssh -i infra/blessvoice-key.pem ubuntu@52.66.45.156
 chmod +x /tmp/setup-gpu.sh && sudo /tmp/setup-gpu.sh
+# Takes ~20 min — monitor with: tail -f /tmp/blessvoice-setup.log
 ```
 
 ---
@@ -138,17 +146,19 @@ This is a safety net — still stop manually when done to be safe.
 
 ---
 
-## IAM Permission Notes (cicd user)
+## IAM Permission Notes
 
-| Permission | Status | Notes |
-|-----------|--------|-------|
-| ec2:RunInstances | GRANTED | Can launch instances |
-| ec2:StartInstances | GRANTED | Can start stopped instances |
-| ec2:StopInstances | GRANTED | Can stop instances |
-| ec2:DescribeInstances | GRANTED | Can list/describe |
-| ec2:CreateSecurityGroup | GRANTED | Can create SGs |
-| ec2:AuthorizeSecurityGroupIngress | GRANTED | Can add SG rules |
-| ec2:CreateKeyPair | BLOCKED | Work around: local ssh-keygen + user-data injection |
-| ec2:ImportKeyPair | BLOCKED | Same workaround |
-| ec2:AllocateAddress | BLOCKED | Need root/admin to allocate EIP manually |
-| ec2:CreateTags | BLOCKED | Tags must be added via console |
+| Permission | Profile | Status | Notes |
+|-----------|---------|--------|-------|
+| ec2:RunInstances | cicd | GRANTED | Used to launch the instance |
+| ec2:StartInstances | cicd | BLOCKED | Use claude-code-ops profile |
+| ec2:StopInstances | cicd | BLOCKED | Use claude-code-ops profile |
+| ec2:StartInstances | claude-code-ops | GRANTED | gpu-start.sh uses this |
+| ec2:StopInstances | claude-code-ops | GRANTED | gpu-stop.sh uses this |
+| ec2:DescribeInstances | cicd | GRANTED | Read-only describe works |
+| ec2:CreateSecurityGroup | cicd | GRANTED | Used to create blessvoice-gpu-sg |
+| ec2:AuthorizeSecurityGroupIngress | cicd | GRANTED | Added SSH/8000/443 rules |
+| ec2:AllocateAddress | cicd | BLOCKED | Allocated manually via claude-code-ops |
+| ec2:CreateKeyPair | cicd | BLOCKED | Worked around: ssh-keygen locally + user-data injection |
+| ec2:ImportKeyPair | cicd | BLOCKED | Same workaround |
+| ec2:CreateTags | cicd | BLOCKED | Tags added via console or claude-code-ops |

@@ -10,6 +10,12 @@ numpy>=1.26.0
 # === CPU Mode (Phase 1 — OpenAI API pipeline) ===
 openai>=1.0.0
 
+# === Agent Mode (Samantha — Whisper + Llama + edge-tts) ===
+# All free, all local. No paid APIs.
+# llama-cpp-python>=0.3.0         # Llama 3.1 8B on CPU (GGUF) — tool calling
+# faster-whisper>=1.0.0           # GPU-accelerated Whisper STT
+# edge-tts>=6.1.0                 # Free Microsoft neural TTS
+
 # === GPU Mode (Phase 2 — PersonaPlex + Llama) ===
 # Uncomment these when deploying to GPU server.
 # Install PersonaPlex: git clone https://github.com/NVIDIA/personaplex && cd personaplex && pip install -e .
